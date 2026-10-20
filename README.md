@@ -35,6 +35,8 @@ the window.
 | EULA | Text per language | TXT |
 | Game content (cntc) | XML | XML |
 | Bitmap fonts (AFNT) | Glyph atlas per font and character range | PNG per font and range |
+| Glyph files of bitmap fonts | Glyph atlas with character range and the fonts using it | PNG |
+| TrueType fonts (10 files) | Specimen in the font itself: sample text in several sizes, every mapped character | TTF |
 | Text, everything else | Text or hex view | raw |
 
 Every file can also be exported raw (decompressed). Whole categories or search

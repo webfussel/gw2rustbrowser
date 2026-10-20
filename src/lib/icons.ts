@@ -122,7 +122,7 @@ const byType: Record<string, IconSpec> = {
 
   AFNT: spec(Type, "font", "Bitmap font"),
   "AFNT glyphs": spec(CaseSensitive, "font", "Bitmap font glyphs"),
-  font: spec(Type, "font", "Font"),
+  font: spec(Type, "font", "TrueType font"),
 
   CINP: spec(Clapperboard, "video", "Cinematic"),
   Bink2: spec(Film, "video", "Bink 2 video"),
@@ -154,6 +154,8 @@ const byKind: Record<string, IconSpec> = {
   eula: spec(Scale, "text", "License agreements"),
   content: spec(Database, "data", "Game content"),
   bitmapfont: spec(Type, "font", "Fonts"),
+  fontglyphs: spec(CaseSensitive, "font", "Font glyphs"),
+  font: spec(Type, "font", "Fonts"),
   binary: spec(Binary, "code", "Binary data"),
 };
 

@@ -53,6 +53,8 @@ export type Kind =
   | "eula"
   | "content"
   | "bitmapfont"
+  | "fontglyphs"
+  | "font"
   | "binary";
 
 export interface FindResult extends FileInfo {
@@ -123,6 +125,23 @@ export interface AnimationInfo {
   chunkVersion: number;
   dataSize: number;
   relocations: number;
+}
+
+export interface TrueTypeInfo {
+  family: string;
+  subfamily: string;
+  fullName: string;
+  version: string;
+  glyphs: number;
+  characters: number[];
+}
+
+export interface GlyphFileInfo {
+  range: number;
+  rangeName: string;
+  first: number;
+  last: number;
+  fonts: number[];
 }
 
 export interface ModelSummary {
@@ -219,6 +238,13 @@ export const api = {
   loadTexture: async (fileId: number) => parseImage(await invoke<ArrayBuffer>("load_texture", { fileId })),
   loadText: (mft: number) => invoke<string>("load_text", { mft }),
   loadAnimation: (mft: number) => invoke<AnimationInfo>("load_animation", { mft }),
+  truetypeInfo: (mft: number) => invoke<TrueTypeInfo>("truetype_info", { mft }),
+  glyphFileInfo: (mft: number) => invoke<GlyphFileInfo>("glyph_file_info", { mft }),
+  glyphFileAtlas: async (mft: number, page: number) => {
+    const image = parseImage(await invoke<ArrayBuffer>("glyph_file_atlas", { mft, page }));
+    const [, pages, glyphs] = image.format.split("|").map(Number);
+    return { image: { ...image, format: `${glyphs} glyphs` }, pages };
+  },
   modelSummary: (mft: number) => invoke<ModelSummary>("model_summary", { mft }),
   loadFonts: (mft: number) => invoke<FontInfo[]>("load_fonts", { mft }),
   fontAtlas: async (mft: number, font: number, range: number, page: number) => {

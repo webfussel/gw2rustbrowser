@@ -552,6 +552,68 @@ fn decode_text(bytes: &[u8]) -> String {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TrueTypeDto {
+    family: String,
+    subfamily: String,
+    full_name: String,
+    version: String,
+    glyphs: u16,
+    characters: Vec<u32>,
+}
+
+#[tauri::command]
+pub async fn truetype_info(app: AppHandle, mft: u32) -> CmdResult<TrueTypeDto> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        let data = session.read(mft).map_err(err)?;
+        let info = formats::truetype::info(&data).map_err(err)?;
+        Ok(TrueTypeDto {
+            family: info.family,
+            subfamily: info.subfamily,
+            full_name: info.full_name,
+            version: info.version,
+            glyphs: info.glyphs,
+            characters: info.characters,
+        })
+    })
+    .await
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlyphFileDto {
+    range: usize,
+    range_name: &'static str,
+    first: u32,
+    last: u32,
+    fonts: Vec<usize>,
+}
+
+#[tauri::command]
+pub async fn glyph_file_info(app: AppHandle, mft: u32) -> CmdResult<GlyphFileDto> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        let (range, fonts) = crate::font_export::glyph_owner(&session, mft)?;
+        let (first, end, range_name) = formats::font::RANGES[range];
+        Ok(GlyphFileDto { range, range_name, first, last: end - 1, fonts })
+    })
+    .await
+}
+
+/// Atlas page of a glyph file; the format string carries `AFNT|<pages>|<glyphs>`.
+#[tauri::command]
+pub async fn glyph_file_atlas(app: AppHandle, mft: u32, page: usize) -> CmdResult<Response> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        let (mut image, pages, glyphs) = crate::font_export::glyph_file_atlas(&session, mft, page)?;
+        image.format = format!("AFNT|{pages}|{glyphs}");
+        Ok(image_response(image))
+    })
+    .await
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FontRangeDto {
     range: usize,
     name: &'static str,

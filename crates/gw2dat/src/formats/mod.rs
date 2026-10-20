@@ -8,6 +8,7 @@ pub mod image;
 pub mod model;
 pub mod pf;
 pub mod text;
+pub mod truetype;
 
 use crate::error::Result;
 use crate::filetype::{FileType, Kind};
@@ -41,6 +42,7 @@ pub fn convert(file_type: FileType, data: Vec<u8>) -> Result<Converted> {
         }
         Kind::Text => Converted { data, extension: "txt" },
         Kind::Content => Converted { data: content::to_xml(&data)?.into_bytes(), extension: "xml" },
+        Kind::Font => Converted { data, extension: "ttf" },
         Kind::Model => Converted { data: model::to_obj(&model::decode(&data)?, "").into_bytes(), extension: "obj" },
         _ => Converted { data, extension: file_type.extension() },
     };
@@ -77,7 +79,8 @@ pub fn converted_extension(file_type: FileType) -> &'static str {
             Kind::Eula | Kind::Text => "txt",
             Kind::Model => "obj",
             Kind::Content => "xml",
-            Kind::BitmapFont => "png",
+            Kind::BitmapFont | Kind::FontGlyphs => "png",
+            Kind::Font => "ttf",
             _ => file_type.extension(),
         },
     }

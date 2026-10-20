@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 use std::time::Instant;
 
-use gw2dat::formats::{animation, audio, content, font, image, model, text};
+use gw2dat::formats::{animation, audio, content, font, image, model, text, truetype};
 use gw2dat::{Archive, FileType, Index, Kind, ScanProgress};
 use rayon::prelude::*;
 
@@ -73,7 +73,10 @@ fn main() -> gw2dat::Result<()> {
                 Ok(a) => Err(format!("implausible header {a:?}")),
                 Err(err) => Err(err.to_string()),
             },
-            Kind::Text => Ok(()),
+            Kind::Font => truetype::info(&data).map(|_| ()).map_err(|e| e.to_string()),
+            // Glyph files need their character range from the font file; the
+            // fonts are checked through `Kind::BitmapFont`.
+            Kind::FontGlyphs | Kind::Text => Ok(()),
         };
         record(&key, result, e.base_id);
     });

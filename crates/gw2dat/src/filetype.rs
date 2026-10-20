@@ -96,14 +96,14 @@ file_types! {
     ShaderCache => "CDHS", "cdhs", Binary, ["Shader Cache"];
     Config => "locl", "locl", Binary, ["Configuration"];
     BitmapFont => "AFNT", "afnt", BitmapFont, ["Bitmap Font"];
-    BitmapFontGlyphs => "AFNT glyphs", "glyphs", Binary, ["Bitmap Font", "Glyphs"];
+    BitmapFontGlyphs => "AFNT glyphs", "glyphs", FontGlyphs, ["Bitmap Font", "Glyphs"];
 
     Binary => "binary", "bin", Binary, ["Binaries"];
     Dll => "DLL", "dll", Binary, ["Binaries"];
     Exe => "EXE", "exe", Binary, ["Binaries"];
 
     Strings => "strs", "strs", Strings, ["Strings"];
-    Font => "font", "eot", Binary, ["Font"];
+    Font => "font", "ttf", Font, ["Font"];
     Bink2Video => "Bink2", "bk2", Binary, ["Bink Videos"];
     Arap => "ARAP", "arap", Binary, ["Misc"];
     Utf8Text => "UTF-8", "txt", Text, ["Text"];
@@ -123,6 +123,10 @@ pub enum Kind {
     Eula,
     Content,
     BitmapFont,
+    /// Glyph images of one character range of a bitmap font.
+    FontGlyphs,
+    /// TrueType font.
+    Font,
     Binary,
 }
 

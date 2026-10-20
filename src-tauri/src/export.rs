@@ -56,6 +56,9 @@ pub async fn export_file(app: AppHandle, mft: u32, path: String, converted: bool
             let name = path.file_stem().ok_or("Invalid path")?.to_string_lossy();
             return crate::model_export::write_model(&session, mft, dir, &name);
         }
+        if converted && session.entry(mft).is_some_and(|e| e.file_type.kind() == gw2dat::Kind::FontGlyphs) {
+            return crate::font_export::write_glyph_file(&session, mft, std::path::Path::new(&path));
+        }
         let is_font = session.entry(mft).is_some_and(|e| e.file_type.kind() == gw2dat::Kind::BitmapFont);
         if converted && is_font {
             // A folder of glyph atlases; the chosen path names the folder.
@@ -144,6 +147,13 @@ pub async fn export_files(
                 }
                 if converted && entry.file_type.kind() == gw2dat::Kind::BitmapFont {
                     return crate::font_export::write_fonts(&session, mft, &dir.join(entry.name()));
+                }
+                if converted && entry.file_type.kind() == gw2dat::Kind::FontGlyphs {
+                    return crate::font_export::write_glyph_file(
+                        &session,
+                        mft,
+                        &dir.join(format!("{}.png", entry.name())),
+                    );
                 }
                 let outputs = export_outputs(&session, mft, converted).map_err(|e| e.to_string())?;
                 std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;

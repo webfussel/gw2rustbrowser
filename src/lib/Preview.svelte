@@ -13,6 +13,8 @@
   import AnimationViewer from "./viewers/AnimationViewer.svelte";
   import FileIcon from "./FileIcon.svelte";
   import ModelSummaryCard from "./viewers/ModelSummaryCard.svelte";
+  import TrueTypeViewer from "./viewers/TrueTypeViewer.svelte";
+  import GlyphFileViewer from "./viewers/GlyphFileViewer.svelte";
 
   /** Model types without meshes get a summary instead of the 3D view. */
   const meshlessModels = ["MODL skeleton", "MODL animset", "MODL empty"];
@@ -25,13 +27,28 @@
   let error = $state<string | null>(null);
   let tab = $state<Tab>("preview");
 
-  const previewKinds = ["image", "text", "content", "sound", "soundbank", "strings", "eula", "model", "animation", "bitmapfont"];
+  const previewKinds = [
+    "image",
+    "text",
+    "content",
+    "sound",
+    "soundbank",
+    "strings",
+    "eula",
+    "model",
+    "animation",
+    "bitmapfont",
+    "fontglyphs",
+    "font",
+  ];
   const hasPreview = $derived(detail !== null && previewKinds.includes(detail.kind));
   const activeTab = $derived<Tab>(hasPreview ? tab : "hex");
 
   $effect(() => {
     const mft = browser.selectedMft;
     error = null;
+    // A newly selected file always opens in its preview.
+    tab = "preview";
     if (mft === null) {
       detail = null;
       return;
@@ -116,6 +133,10 @@
         <AnimationViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "bitmapfont"}
         <FontViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "font"}
+        <TrueTypeViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "fontglyphs"}
+        <GlyphFileViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "model" && meshlessModels.includes(d.type)}
         <ModelSummaryCard mft={d.mft} type={d.type} />
       {:else if activeTab === "preview" && d.kind === "model"}
