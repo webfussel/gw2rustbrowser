@@ -146,6 +146,22 @@ export async function search(query: string) {
   }
 }
 
+/** Selects a file by base or file id and shows it in its category. */
+export async function showFile(id: number) {
+  try {
+    const match = (await api.find(String(id))).find((r) => r.baseId === id || r.fileId === id);
+    if (!match) {
+      notify(`File ${id} is not in the archive`, "error");
+      return;
+    }
+    clearSearch();
+    await revealCategory(match.category);
+    browser.selectedMft = match.mft;
+  } catch (error) {
+    notify(errorMessage(error), "error");
+  }
+}
+
 export function clearSearch() {
   browser.searchQuery = "";
   browser.searchResults = null;

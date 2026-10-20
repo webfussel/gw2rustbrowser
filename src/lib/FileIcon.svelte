@@ -1,9 +1,13 @@
 <script lang="ts">
-  import { iconFor } from "./icons";
+  import { iconFor, type IconSpec } from "./icons";
 
-  let { type, size = 15 }: { type: string | null | undefined; size?: number } = $props();
+  let {
+    type = null,
+    spec: given = undefined,
+    size = 15,
+  }: { type?: string | null; spec?: IconSpec; size?: number } = $props();
 
-  const spec = $derived(iconFor(type));
+  const spec = $derived(given ?? iconFor(type));
 </script>
 
 <span class="icon tone-{spec.tone}" title={spec.label} aria-label={spec.label} role="img">

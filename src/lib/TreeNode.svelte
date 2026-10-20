@@ -2,6 +2,7 @@
   import { browser, selectCategory } from "./state.svelte";
   import TreeNode from "./TreeNode.svelte";
   import FileIcon from "./FileIcon.svelte";
+  import { iconForCategory } from "./icons";
 
   let { id, depth }: { id: number; depth: number } = $props();
 
@@ -48,7 +49,7 @@
   {:else}
     <span class="twisty"></span>
   {/if}
-  <FileIcon type={category.content} />
+  <FileIcon spec={iconForCategory(category)} />
   <span class="name">{category.name}</span>
   <span class="count">{category.total.toLocaleString()}</span>
 </div>

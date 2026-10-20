@@ -40,8 +40,28 @@ the window.
 Every file can also be exported raw (decompressed). Whole categories or search
 results are exported in parallel with a progress bar.
 
-Tree and file list show an icon for each of the 58 file types; a category
-takes the icon of its most common content.
+Tree and file list show an icon for each of the 67 file types; a category
+takes the icon of its content (of its most common kind if it mixes types).
+
+Models are sorted by what they are, judged from their skeleton, animation,
+material and mesh data (only the file up to those chunk headers is read while
+scanning, not the geometry):
+
+| Folder | Files | Detection |
+|---|---|---|
+| Props | 92,354 | single bone: rocks, terrain pieces, buildings |
+| Equipment & body parts | 40,092 | bound to a player skeleton (one shared by ≥ 1,000 models), or untextured on another skeleton: armor, hair, faces |
+| Multi-part props | 24,473 | own multi-bone skeleton, no animations |
+| Animated | 18,609 | own skeleton with an animation bank: cloth, banners, moving objects |
+| Creatures & NPCs | 1,587 | textured and bound to a non-player skeleton: animals, monsters, NPCs |
+| Animations | 15,218 | a single ANIM chunk (Granny animation clip) |
+| Skeletons | 5,951 | no meshes, own skeleton; the other models are bound to these |
+| Animation sets | 1,514 | no meshes, animations for another file's skeleton |
+| Without geometry | 374 | neither meshes nor animations |
+| Bone scales | 64 | `bone` files: body proportions for character creation |
+
+The eight player skeletons are recognised by counting how many models share
+each skeleton, so no id list has to be maintained.
 
 Search: file ID (base or file ID, also by prefix) or `#<MFT index>`.
 Shortcuts: `Ctrl+O` open, `Ctrl+F` search, arrow keys/PageUp/PageDown in the

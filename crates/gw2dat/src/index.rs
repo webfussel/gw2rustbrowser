@@ -12,6 +12,7 @@ use rayon::prelude::*;
 use crate::archive::{Archive, FIRST_FILE_ENTRY};
 use crate::error::Result;
 use crate::filetype::{self, FileType, Identified, PEEK_SIZE};
+use crate::formats::model::{Classified, ModelInfo, classify};
 
 #[derive(Clone, Debug)]
 pub struct Category {
@@ -32,6 +33,11 @@ pub struct IndexEntry {
     /// with the current MFT means the file changed.
     pub stored_offset: u64,
     pub stored_size: u32,
+    /// Related file id: for models bound to an external skeleton, that
+    /// skeleton's id; otherwise 0.
+    pub reference: u32,
+    /// For models: a material references a diffuse texture.
+    pub textured: bool,
 }
 
 impl IndexEntry {
@@ -64,6 +70,47 @@ struct Scanned {
     file_type: FileType,
     size: u32,
     path: Vec<String>,
+    reference: u32,
+    textured: bool,
+}
+
+/// Sorts a model by its skeleton, animation, material and mesh data. Only the
+/// file up to the `MODL`, `SKEL`, `ANIM` and `GEOM` chunk headers is
+/// decompressed, not the geometry itself.
+fn classify_model(archive: &Archive, index: u32, size: usize) -> ModelInfo {
+    let mut len = (64 * 1024).min(size);
+    loop {
+        let Ok(prefix) = archive.peek(index, len) else { return ModelInfo::default() };
+        match classify(&prefix, size) {
+            Classified::Info(info) => return info,
+            Classified::NeedBytes(needed) if prefix.len() < size => len = needed.max(len * 2).min(size),
+            Classified::NeedBytes(_) => return ModelInfo::default(),
+        }
+    }
+}
+
+/// A skeleton shared by at least this many models is a player race skeleton:
+/// the eight player skeletons have ~5,000 armor and body parts each, creature
+/// skeletons at most a few dozen models.
+const PLAYER_SKELETON_USERS: usize = 1000;
+
+/// Models bound to a player skeleton are equipment or body parts, even when
+/// textured (hair, faces, NPC outfits); others keep their texture-based type.
+fn split_skeleton_users(all: &mut [Scanned]) {
+    let candidate = |s: &Scanned| matches!(s.file_type, FileType::ModelEquipment | FileType::ModelCreature);
+    let mut users: HashMap<u32, usize> = HashMap::new();
+    for s in all.iter().filter(|s| candidate(s)) {
+        *users.entry(s.reference).or_default() += 1;
+    }
+    for s in all.iter_mut().filter(|s| candidate(s)) {
+        let file_type = if users[&s.reference] >= PLAYER_SKELETON_USERS || !s.textured {
+            FileType::ModelEquipment
+        } else {
+            FileType::ModelCreature
+        };
+        s.file_type = file_type;
+        s.path = file_type.category().iter().map(|s| s.to_string()).collect();
+    }
 }
 
 fn scan_entry(archive: &Archive, index: u32) -> Result<Option<Scanned>> {
@@ -83,7 +130,14 @@ fn scan_entry(archive: &Archive, index: u32) -> Result<Option<Scanned>> {
             Identified::NeedMore(_) => break FileType::Unknown,
         }
     };
-    let file_type = filetype::refine(file_type, &head, size);
+    let mut file_type = filetype::refine(file_type, &head, size);
+    let (mut reference, mut textured) = (0, false);
+    if file_type == FileType::Model {
+        let info = classify_model(archive, index, size as usize);
+        file_type = info.file_type();
+        reference = info.skeleton.unwrap_or(0);
+        textured = info.textured;
+    }
     // Strings files store their language in the second-to-last byte.
     let tail = if file_type == FileType::Strings {
         let data = archive.read(index)?;
@@ -91,9 +145,8 @@ fn scan_entry(archive: &Archive, index: u32) -> Result<Option<Scanned>> {
     } else {
         None
     };
-    let base_id = archive.ids(index).base_id;
-    let path = filetype::categorize(file_type, &head, base_id, tail);
-    Ok(Some(Scanned { mft_index: index, file_type, size, path }))
+    let path = filetype::categorize(file_type, &head, tail);
+    Ok(Some(Scanned { mft_index: index, file_type, size, path, reference, textured }))
 }
 
 /// Glyph files of bitmap fonts have no signature; find them through the
@@ -149,6 +202,8 @@ impl Index {
                         file_type: FileType::Unknown,
                         size: archive.entry(index).map_or(0, |e| e.size),
                         path: vec!["Unreadable".to_string()],
+                        reference: 0,
+                        textured: false,
                     })
                 });
                 progress.done.fetch_add(1, Ordering::Relaxed);
@@ -161,10 +216,13 @@ impl Index {
             file_type: e.file_type,
             size: e.size,
             path,
+            reference: e.reference,
+            textured: e.textured,
         });
         let mut all: Vec<Scanned> = scanned.into_iter().chain(reused).collect();
         all.sort_unstable_by_key(|s| s.mft_index);
         mark_font_glyphs(archive, &mut all);
+        split_skeleton_users(&mut all);
 
         let mut index = Index::default();
         let mut lookup: HashMap<(Option<u32>, String), u32> = HashMap::new();
@@ -188,6 +246,8 @@ impl Index {
                 category: parent.expect("every path has at least one level"),
                 stored_offset: stored.map_or(0, |e| e.offset),
                 stored_size: stored.map_or(0, |e| e.size),
+                reference: item.reference,
+                textured: item.textured,
             });
         }
         index
@@ -211,7 +271,7 @@ impl Index {
 
 const CACHE_MAGIC: &[u8; 8] = b"GW2BIDX\0";
 /// Bump whenever file type detection or categorisation changes.
-const CACHE_VERSION: u32 = 5;
+const CACHE_VERSION: u32 = 8;
 
 impl Index {
     pub fn save(&self, path: &Path) -> io::Result<()> {
@@ -236,6 +296,8 @@ impl Index {
             out.extend_from_slice(&e.category.to_le_bytes());
             out.extend_from_slice(&e.stored_offset.to_le_bytes());
             out.extend_from_slice(&e.stored_size.to_le_bytes());
+            out.extend_from_slice(&e.reference.to_le_bytes());
+            out.push(e.textured as u8);
         }
         // Write to a temporary file first so a crash never leaves a broken cache.
         let tmp = path.with_extension("tmp");
@@ -275,6 +337,8 @@ impl Index {
             }
             let stored_offset = u64::from_le_bytes(r.bytes(8)?.try_into().ok()?);
             let stored_size = r.u32()?;
+            let reference = r.u32()?;
+            let textured = r.bytes(1)?[0] != 0;
             index.entries.push(IndexEntry {
                 mft_index,
                 base_id,
@@ -284,6 +348,8 @@ impl Index {
                 category,
                 stored_offset,
                 stored_size,
+                reference,
+                textured,
             });
         }
         Some(index)
@@ -329,6 +395,8 @@ mod tests {
                 category: 1,
                 stored_offset: 0x1000,
                 stored_size: 80,
+                reference: 7,
+                textured: true,
             }],
         };
         let path = std::env::temp_dir().join(format!("gw2dat-test-{}.bin", std::process::id()));
@@ -337,6 +405,8 @@ mod tests {
         assert_eq!(loaded.category_path(loaded.entries[0].category), ["Textures", "UI Textures"]);
         assert_eq!(loaded.entries[0].file_type, FileType::Ateu);
         assert_eq!(loaded.entries[0].stored_offset, 0x1000);
+        assert_eq!(loaded.entries[0].reference, 7);
+        assert!(loaded.entries[0].textured);
 
         // Damaged files are ignored rather than trusted.
         let mut bytes = std::fs::read(&path).unwrap();

@@ -12,6 +12,10 @@
   import FontViewer from "./viewers/FontViewer.svelte";
   import AnimationViewer from "./viewers/AnimationViewer.svelte";
   import FileIcon from "./FileIcon.svelte";
+  import ModelSummaryCard from "./viewers/ModelSummaryCard.svelte";
+
+  /** Model types without meshes get a summary instead of the 3D view. */
+  const meshlessModels = ["MODL skeleton", "MODL animset", "MODL empty"];
   // three.js is large; load the 3D viewer only when a model is shown.
   const modelViewer = () => import("./viewers/ModelViewer.svelte");
 
@@ -112,6 +116,8 @@
         <AnimationViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "bitmapfont"}
         <FontViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "model" && meshlessModels.includes(d.type)}
+        <ModelSummaryCard mft={d.mft} type={d.type} />
       {:else if activeTab === "preview" && d.kind === "model"}
         {#await modelViewer() then { default: ModelViewer }}
           <ModelViewer mft={d.mft} />

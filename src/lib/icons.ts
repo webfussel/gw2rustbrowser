@@ -2,6 +2,8 @@ import {
   AppWindow,
   AudioLines,
   Binary,
+  Blocks,
+  Bone,
   Box,
   CaseSensitive,
   Clapperboard,
@@ -31,13 +33,19 @@ import {
   Network,
   Package,
   Palette,
+  PawPrint,
   PersonStanding,
   Puzzle,
+  Rotate3d,
   Scale,
   ScrollText,
   Settings,
+  Shirt,
   ShieldCheck,
+  SlidersHorizontal,
+  SquareDashed,
   SunDim,
+  Trees,
   Type,
 } from "@lucide/svelte";
 
@@ -79,6 +87,15 @@ const byType: Record<string, IconSpec> = {
   RIFF: spec(File, "data", "RIFF container"),
 
   MODL: spec(Box, "model", "3D model"),
+  "MODL prop": spec(Trees, "model", "Prop (rocks, terrain pieces, buildings)"),
+  "MODL multi": spec(Blocks, "model", "Multi-part prop"),
+  "MODL animated": spec(Rotate3d, "model", "Animated model (creatures, cloth, moving objects)"),
+  "MODL equip": spec(Shirt, "model", "Equipment or body part (uses a player skeleton)"),
+  "MODL creature": spec(PawPrint, "model", "Creature or NPC (uses its own skeleton file)"),
+  "MODL skeleton": spec(Bone, "animation", "Skeleton (no meshes)"),
+  "MODL animset": spec(ListVideo, "animation", "Animation set for a skeleton (no meshes)"),
+  "MODL empty": spec(SquareDashed, "unknown", "Model without geometry"),
+  bone: spec(SlidersHorizontal, "animation", "Bone scales (character creation)"),
   "MODL anim": spec(PersonStanding, "animation", "Animation clip"),
   anic: spec(ListVideo, "animation", "Animation sequences"),
   emoc: spec(Hand, "animation", "Emote animations"),
@@ -124,6 +141,27 @@ const byType: Record<string, IconSpec> = {
 
 const fallback = spec(File, "unknown", "File");
 const folder = spec(Folder, "unknown", "Folder");
+
+/** Generic icon per kind, for categories that mix several file types. */
+const byKind: Record<string, IconSpec> = {
+  image: spec(Image, "image", "Images"),
+  sound: spec(AudioLines, "sound", "Sounds"),
+  soundbank: spec(Library, "sound", "Sound banks"),
+  model: spec(Box, "model", "Models"),
+  animation: spec(PersonStanding, "animation", "Animations"),
+  strings: spec(Languages, "text", "Strings"),
+  text: spec(FileText, "text", "Text"),
+  eula: spec(Scale, "text", "License agreements"),
+  content: spec(Database, "data", "Game content"),
+  bitmapfont: spec(Type, "font", "Fonts"),
+  binary: spec(Binary, "code", "Binary data"),
+};
+
+/** Icon of a category: its file type, or its kind when it mixes types. */
+export function iconForCategory(category: { content: string | null; contentKind: string | null; mixed: boolean }): IconSpec {
+  if (category.mixed && category.contentKind) return byKind[category.contentKind] ?? iconFor(category.content);
+  return iconFor(category.content);
+}
 
 export function iconFor(type: string | null | undefined): IconSpec {
   if (!type) return folder;

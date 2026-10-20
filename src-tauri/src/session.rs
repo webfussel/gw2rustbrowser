@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use gw2dat::{Archive, FileType, Index, IndexEntry};
+use gw2dat::{Archive, FileType, Index, IndexEntry, Kind};
 
 pub struct Session {
     pub archive: Archive,
@@ -14,11 +14,30 @@ pub struct Session {
     pub files: Vec<Vec<u32>>,
     /// Number of files in each category including all subcategories.
     pub totals: Vec<u32>,
-    /// Most common file type in each category including subcategories.
-    pub dominant: Vec<Option<FileType>>,
+    /// Representative file type of each category (including subcategories),
+    /// and whether the category mixes several types.
+    pub content: Vec<Option<(FileType, bool)>>,
     by_mft: HashMap<u32, u32>,
+    /// Number of models bound to each skeleton id.
+    pub skeleton_users: HashMap<u32, u32>,
     /// The most recently read file; previews read the same file repeatedly.
     recent: Mutex<Option<(u32, Arc<Vec<u8>>)>>,
+}
+
+/// For mixed categories, the most common type of the most common kind,
+/// preferring any viewable kind over plain binary data.
+fn representative(counts: &HashMap<FileType, u32>) -> Option<(FileType, bool)> {
+    let mut kinds: HashMap<Kind, u32> = HashMap::new();
+    for (t, &n) in counts {
+        *kinds.entry(t.kind()).or_default() += n;
+    }
+    let kind = kinds.iter().max_by_key(|&(k, n)| (*k != Kind::Binary, *n)).map(|(&k, _)| k)?;
+    let file_type = counts
+        .iter()
+        .filter(|(t, _)| t.kind() == kind)
+        .max_by_key(|&(t, n)| (*n, std::cmp::Reverse(*t)))
+        .map(|(&t, _)| t)?;
+    Some((file_type, counts.len() > 1))
 }
 
 impl Session {
@@ -52,11 +71,12 @@ impl Session {
                 current = index.categories[c as usize].parent;
             }
         }
-        let dominant = type_counts
-            .iter()
-            .map(|counts| counts.iter().max_by_key(|&(t, n)| (*n, std::cmp::Reverse(*t))).map(|(&t, _)| t))
-            .collect();
-        Session { archive, index, children, files, totals, dominant, by_mft, recent: Mutex::new(None) }
+        let content = type_counts.iter().map(representative).collect();
+        let mut skeleton_users: HashMap<u32, u32> = HashMap::new();
+        for e in index.entries.iter().filter(|e| e.reference != 0) {
+            *skeleton_users.entry(e.reference).or_default() += 1;
+        }
+        Session { archive, index, children, files, totals, content, by_mft, skeleton_users, recent: Mutex::new(None) }
     }
 
     pub fn entry(&self, mft_index: u32) -> Option<&IndexEntry> {

@@ -15,8 +15,11 @@ export interface Category {
   parent: number | null;
   total: number;
   files: number;
-  /** Most common file type below this category. */
+  /** Representative file type below this category. */
   content: string | null;
+  contentKind: Kind | null;
+  /** Whether the category contains several file types. */
+  mixed: boolean;
 }
 
 export interface FileInfo {
@@ -122,6 +125,16 @@ export interface AnimationInfo {
   relocations: number;
 }
 
+export interface ModelSummary {
+  bones: number;
+  meshes: number;
+  animations: number;
+  materials: number;
+  textured: boolean;
+  skeleton: number | null;
+  users: number;
+}
+
 export interface ModelMaterial {
   index: number;
   diffuse: number | null;
@@ -206,6 +219,7 @@ export const api = {
   loadTexture: async (fileId: number) => parseImage(await invoke<ArrayBuffer>("load_texture", { fileId })),
   loadText: (mft: number) => invoke<string>("load_text", { mft }),
   loadAnimation: (mft: number) => invoke<AnimationInfo>("load_animation", { mft }),
+  modelSummary: (mft: number) => invoke<ModelSummary>("model_summary", { mft }),
   loadFonts: (mft: number) => invoke<FontInfo[]>("load_fonts", { mft }),
   fontAtlas: async (mft: number, font: number, range: number, page: number) => {
     const image = parseImage(await invoke<ArrayBuffer>("font_atlas", { mft, font, range, page }));

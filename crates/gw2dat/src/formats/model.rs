@@ -31,6 +31,8 @@ mod fvf {
 pub struct Mesh {
     pub material_index: u32,
     pub material_name: String,
+    /// Flexible vertex format bits (see `fvf`).
+    pub vertex_format: u32,
     /// Positions in a right-handed, Y-up coordinate system.
     pub positions: Vec<[f32; 3]>,
     pub normals: Vec<[f32; 3]>,
@@ -211,7 +213,7 @@ fn read_mesh(mut c: Cursor) -> Result<Option<Mesh>> {
     let vertices = geometry.byte_array()?;
     let (index_count, mut index_data) = geometry.array()?;
 
-    let mut mesh = Mesh { material_index, material_name, ..Mesh::default() };
+    let mut mesh = Mesh { material_index, material_name, vertex_format: format, ..Mesh::default() };
     if vertex_count > 0 {
         decode_vertices(format, vertex_count, vertices, &mut mesh)?;
     }
@@ -489,5 +491,179 @@ mod tests {
         };
         let obj = to_obj(&model, "test");
         assert!(obj.contains("\nf 1 2 3\n"));
+    }
+}
+
+pub const SKEL: u32 = fcc(b"SKEL");
+pub const ANIM: u32 = fcc(b"ANIM");
+
+/// What [`classify`] learns about a model without decoding its geometry.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ModelInfo {
+    /// Bones of the model's own skeleton.
+    pub bones: usize,
+    /// External skeleton the model is bound to.
+    pub skeleton: Option<u32>,
+    /// The model has an animation bank.
+    pub animated: bool,
+    pub meshes: u32,
+    /// A material references a diffuse texture.
+    pub textured: bool,
+}
+
+impl ModelInfo {
+    /// The model's type, before models bound to an external skeleton are
+    /// split by how many models share that skeleton (see `crate::index`).
+    pub fn file_type(&self) -> crate::FileType {
+        use crate::FileType;
+        if self.meshes == 0 {
+            return if self.bones > 1 {
+                FileType::ModelSkeleton
+            } else if self.skeleton.is_some() && self.animated {
+                FileType::ModelAnimationSet
+            } else {
+                FileType::ModelEmpty
+            };
+        }
+        if self.skeleton.is_some() && self.bones == 0 {
+            // Creatures and NPCs come with textures; armor parts are textured
+            // (and dyed) by the game at runtime.
+            return if self.textured { FileType::ModelCreature } else { FileType::ModelEquipment };
+        }
+        match self.bones {
+            _ if self.animated => FileType::ModelAnimated,
+            0 => FileType::Model,
+            1 => FileType::ModelProp,
+            _ => FileType::ModelMultiPart,
+        }
+    }
+}
+
+pub enum Classified {
+    Info(ModelInfo),
+    /// The prefix ends before the needed chunks; read at least this much.
+    NeedBytes(usize),
+}
+
+/// Classifies a model from a prefix of its decompressed data. Needs the
+/// `MODL`, `SKEL` and `ANIM` chunks and the first bytes of `GEOM`.
+pub fn classify(prefix: &[u8], file_size: usize) -> Classified {
+    let (mut found_modl, mut found_skel, mut found_anim) = (false, false, false);
+    let mut meshes: Option<u32> = None;
+    let mut pos = 12usize;
+    while pos + 16 <= file_size && !(found_modl && found_skel && found_anim && meshes.is_some()) {
+        let Some(header) = prefix.get(pos..pos + 16) else { return Classified::NeedBytes(pos + 16) };
+        let magic = u32::from_le_bytes(header[0..4].try_into().unwrap());
+        let end = pos + 8 + u32::from_le_bytes(header[4..8].try_into().unwrap()) as usize;
+        if magic == MODL_CHUNK || magic == SKEL || magic == ANIM {
+            if end > prefix.len() && prefix.len() < file_size {
+                return Classified::NeedBytes(end);
+            }
+            found_modl |= magic == MODL_CHUNK;
+            found_skel |= magic == SKEL;
+            found_anim |= magic == ANIM;
+        }
+        if magic == GEOM {
+            // The mesh list (a RefList) starts the chunk payload.
+            match prefix.get(pos + 16..pos + 20) {
+                Some(count) => meshes = Some(u32::from_le_bytes(count.try_into().unwrap())),
+                None if prefix.len() < file_size => return Classified::NeedBytes(pos + 20),
+                None => {}
+            }
+        }
+        if end <= pos {
+            break;
+        }
+        pos = end;
+    }
+    let meshes = meshes.unwrap_or(0);
+    let Ok(file) = PackFile::parse(prefix) else {
+        return Classified::Info(ModelInfo { meshes, ..ModelInfo::default() });
+    };
+    match skeleton_and_animation(&file) {
+        Ok((bones, skeleton, animated)) => {
+            let textured = materials(prefix)
+                .is_ok_and(|materials| materials.iter().any(|m| m.texture(TextureSlot::Diffuse).is_some()));
+            Classified::Info(ModelInfo { bones, skeleton, animated, meshes, textured })
+        }
+        // A pointer led past the prefix: read everything.
+        Err(_) if prefix.len() < file_size => Classified::NeedBytes(file_size),
+        Err(_) => Classified::Info(ModelInfo { meshes, ..ModelInfo::default() }),
+    }
+}
+
+/// Own bone count, external skeleton and whether there is an animation bank.
+fn skeleton_and_animation(file: &PackFile) -> Result<(usize, Option<u32>, bool)> {
+    let (mut bones, mut skeleton) = (0usize, None);
+    if let Some(skel) = file.chunk(SKEL) {
+        // skeleton data -> Granny model (name, skeleton -> (name, bones))
+        let mut c = skel.cursor();
+        let data = c.ptr()?;
+        skeleton = c.file_ref()?;
+        if let Some(mut model) = data.map(|mut d| d.ptr()).transpose()?.flatten() {
+            model.string()?;
+            if let Some(mut own) = model.ptr()? {
+                own.string()?;
+                bones = own.array()?.0;
+            }
+        }
+    }
+    let animated = match file.chunk(ANIM) {
+        Some(anim) => match anim.cursor().ptr()? {
+            Some(mut bank) => bank.array()?.0 > 0,
+            None => false,
+        },
+        None => false,
+    };
+    Ok((bones, skeleton, animated))
+}
+
+/// Structural facts about a model file, for display.
+#[derive(Clone, Copy, Debug)]
+pub struct ModelSummary {
+    pub info: ModelInfo,
+    /// Clips in the animation bank.
+    pub animations: usize,
+    pub materials: usize,
+}
+
+pub fn summary(data: &[u8]) -> Result<ModelSummary> {
+    let info = match classify(data, data.len()) {
+        Classified::Info(info) => info,
+        Classified::NeedBytes(_) => return Err(Error::Truncated),
+    };
+    let file = PackFile::parse(data)?;
+    let animations = match file.chunk(ANIM) {
+        Some(anim) => anim.cursor().ptr()?.map(|mut bank| bank.array().map(|(n, _)| n)).transpose()?.unwrap_or(0),
+        None => 0,
+    };
+    let materials = materials(data).map(|m| m.len()).unwrap_or(0);
+    Ok(ModelSummary { info, animations, materials })
+}
+
+#[cfg(test)]
+mod classification_tests {
+    use super::*;
+    use crate::FileType;
+
+    fn info(bones: usize, skeleton: Option<u32>, animated: bool, meshes: u32, textured: bool) -> FileType {
+        ModelInfo { bones, skeleton, animated, meshes, textured }.file_type()
+    }
+
+    #[test]
+    fn meshless_models() {
+        assert_eq!(info(60, None, true, 0, false), FileType::ModelSkeleton);
+        assert_eq!(info(0, Some(5), true, 0, false), FileType::ModelAnimationSet);
+        assert_eq!(info(0, Some(5), false, 0, false), FileType::ModelEmpty);
+        assert_eq!(info(1, None, false, 0, false), FileType::ModelEmpty);
+    }
+
+    #[test]
+    fn models_with_meshes() {
+        assert_eq!(info(0, Some(5), false, 2, true), FileType::ModelCreature);
+        assert_eq!(info(0, Some(5), true, 2, false), FileType::ModelEquipment);
+        assert_eq!(info(30, None, true, 1, true), FileType::ModelAnimated);
+        assert_eq!(info(30, None, false, 1, true), FileType::ModelMultiPart);
+        assert_eq!(info(1, None, false, 1, false), FileType::ModelProp);
     }
 }

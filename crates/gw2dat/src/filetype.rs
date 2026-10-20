@@ -67,8 +67,17 @@ file_types! {
     Bank => "ABNK", "abnk", SoundBank, ["Soundbank"];
     BankIndex => "ABIX", "abix", Binary, ["Soundbank Index"];
     AudioScript => "AMSP", "amsp", Binary, ["Audio Scripts"];
-    Model => "MODL", "modl", Model, ["Models"];
+    Model => "MODL", "modl", Model, ["Models", "Other"];
+    ModelProp => "MODL prop", "modl", Model, ["Models", "Props"];
+    ModelMultiPart => "MODL multi", "modl", Model, ["Models", "Multi-part props"];
+    ModelAnimated => "MODL animated", "modl", Model, ["Models", "Animated"];
+    ModelEquipment => "MODL equip", "modl", Model, ["Models", "Equipment & body parts"];
+    ModelCreature => "MODL creature", "modl", Model, ["Models", "Creatures & NPCs"];
+    ModelSkeleton => "MODL skeleton", "modl", Model, ["Models", "Skeletons"];
+    ModelAnimationSet => "MODL animset", "modl", Model, ["Models", "Animation sets"];
+    ModelEmpty => "MODL empty", "modl", Model, ["Models", "Without geometry"];
     ModelAnimation => "MODL anim", "modl", Animation, ["Models", "Animations"];
+    BoneScale => "bone", "bone", Binary, ["Models", "Bone scales"];
     ModelCollisionManifest => "cmaC", "cmac", Binary, ["Model Collision Manifest"];
     DependencyTable => "DEPS", "deps", Binary, ["Dependency Tables"];
     Eula => "eula", "eula", Eula, ["EULA"];
@@ -102,7 +111,7 @@ file_types! {
 }
 
 /// Which viewer/exporter handles a file type.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Kind {
     Image,
     Sound,
@@ -174,6 +183,7 @@ const PF_TYPES: &[(u32, FileType)] = &[
     (fcc(b"CDHS"), FileType::ShaderCache),
     (fcc(b"locl"), FileType::Config),
     (fcc(b"AFNT"), FileType::BitmapFont),
+    (fcc(b"bone"), FileType::BoneScale),
 ];
 
 /// Bytes read from the start of every entry while scanning. Enough for all
@@ -276,7 +286,7 @@ pub fn refine(file_type: FileType, head: &[u8], size: u32) -> FileType {
 
 /// Full category path of a file. `head` holds the first bytes of the file,
 /// `tail` (only needed for strings files) its last two bytes.
-pub fn categorize(file_type: FileType, head: &[u8], base_id: u32, tail: Option<[u8; 2]>) -> Vec<String> {
+pub fn categorize(file_type: FileType, head: &[u8], tail: Option<[u8; 2]>) -> Vec<String> {
     let mut path: Vec<String> = file_type.category().iter().map(|s| s.to_string()).collect();
     let u16_at = |offset: usize| head.get(offset..offset + 2).map(|b| u16::from_le_bytes([b[0], b[1]]));
 
@@ -304,7 +314,6 @@ pub fn categorize(file_type: FileType, head: &[u8], base_id: u32, tail: Option<[
                 None => "Unknown".into(),
             });
         }
-        FileType::Model => path.push(format!("{}xxxx", base_id / 10000)),
         FileType::Pf => {
             if let Some(pf_type) = u32_at(head, 8) {
                 path.push(crate::fourcc::display(pf_type));

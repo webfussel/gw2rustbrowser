@@ -116,8 +116,12 @@ pub struct CategoryDto {
     total: u32,
     /// Files directly in this category.
     files: u32,
-    /// Most common file type below this category, for its icon.
+    /// Representative file type below this category, for its icon.
     content: Option<&'static str>,
+    /// Kind of that type (lower case).
+    content_kind: Option<String>,
+    /// Whether the category contains several file types.
+    mixed: bool,
 }
 
 #[tauri::command]
@@ -134,7 +138,9 @@ pub fn categories(state: State<'_, AppState>) -> CmdResult<Vec<CategoryDto>> {
             parent: c.parent,
             total: session.totals[id],
             files: session.files[id].len() as u32,
-            content: session.dominant[id].map(|t| t.name()),
+            content: session.content[id].map(|(t, _)| t.name()),
+            content_kind: session.content[id].map(|(t, _)| format!("{:?}", t.kind()).to_lowercase()),
+            mixed: session.content[id].is_some_and(|(_, mixed)| mixed),
         })
         .collect())
 }
@@ -466,6 +472,45 @@ pub async fn load_animation(app: AppHandle, mft: u32) -> CmdResult<AnimationDto>
             chunk_version: info.chunk_version,
             data_size: info.data_size,
             relocations: info.relocations,
+        })
+    })
+    .await
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelSummaryDto {
+    bones: usize,
+    meshes: u32,
+    animations: usize,
+    materials: usize,
+    textured: bool,
+    /// External skeleton this model is bound to.
+    skeleton: Option<u32>,
+    /// Models bound to this file as their skeleton.
+    users: u32,
+}
+
+#[tauri::command]
+pub async fn model_summary(app: AppHandle, mft: u32) -> CmdResult<ModelSummaryDto> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        let entry = *session.entry(mft).ok_or("Unknown file")?;
+        let data = session.read(mft).map_err(err)?;
+        let summary = formats::model::summary(&data).map_err(err)?;
+        let users = [entry.base_id, entry.file_id]
+            .iter()
+            .filter(|&&id| id != 0)
+            .map(|id| session.skeleton_users.get(id).copied().unwrap_or(0))
+            .sum();
+        Ok(ModelSummaryDto {
+            bones: summary.info.bones,
+            meshes: summary.info.meshes,
+            animations: summary.animations,
+            materials: summary.materials,
+            textured: summary.info.textured,
+            skeleton: summary.info.skeleton,
+            users,
         })
     })
     .await

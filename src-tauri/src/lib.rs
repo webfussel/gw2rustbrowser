@@ -41,6 +41,7 @@ pub fn run() {
             commands::load_fonts,
             commands::load_text,
             commands::load_animation,
+            commands::model_summary,
             commands::font_atlas,
             commands::suggest_file_name,
             export::export_file,

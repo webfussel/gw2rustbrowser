@@ -51,7 +51,8 @@ fn decodes_a_sample_of_every_kind() {
             _ => {}
         }
     }
-    for kind in [FileType::Atex, FileType::PackedMp3, FileType::Model, FileType::Strings] {
+    for kind in [FileType::Atex, FileType::PackedMp3, FileType::ModelProp, FileType::ModelAnimation, FileType::Strings]
+    {
         assert!(seen.contains_key(&kind), "no {kind:?} found");
     }
 }
