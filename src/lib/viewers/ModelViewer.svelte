@@ -15,6 +15,9 @@
   let colorMeshes = $state(true);
   let showGrid = $state(true);
   let useTextures = $state(true);
+  // Many diffuse textures use alpha as a mask (e.g. gloss), not as opacity;
+  // cutting at alpha would hide those parts. Opt-in for foliage and hair.
+  let alphaCutout = $state(false);
   let texturedCount = $state(0);
 
   const palette = [0xd9a066, 0x7fb3d5, 0xa3d977, 0xe08f8f, 0xc39bd3, 0xf0d264, 0x76d7c4, 0xf5b7b1];
@@ -92,11 +95,12 @@
     for (const [i, m] of materials.entries()) {
       if (!m) continue;
       const map = useTextures ? (maps[i] ?? null) : null;
-      if (m.map !== map) {
+      const alphaTest = map && alphaCutout ? 0.3 : 0;
+      if (m.map !== map || m.alphaTest !== alphaTest) {
         m.map = map;
+        m.alphaTest = alphaTest;
         m.needsUpdate = true;
       }
-      m.alphaTest = map ? 0.3 : 0;
       m.wireframe = wireframe;
       m.color.setHex(map ? 0xffffff : colorMeshes ? palette[i % palette.length] : neutral);
     }
@@ -218,7 +222,7 @@
   });
 
   $effect(() => {
-    void [wireframe, colorMeshes, showGrid, useTextures];
+    void [wireframe, colorMeshes, showGrid, useTextures, alphaCutout];
     updateMaterials();
   });
 </script>
@@ -226,6 +230,9 @@
 <div class="bar">
   <button class="btn small ghost" onclick={resetView}>Reset view</button>
   <label><input type="checkbox" bind:checked={useTextures} disabled={texturedCount === 0} /> Textures</label>
+  <label title="Hide pixels with low texture alpha (foliage, hair). Off by default: many textures use alpha for other purposes.">
+    <input type="checkbox" bind:checked={alphaCutout} disabled={texturedCount === 0 || !useTextures} /> Alpha cutout
+  </label>
   <label><input type="checkbox" bind:checked={wireframe} /> Wireframe</label>
   <label><input type="checkbox" bind:checked={colorMeshes} /> Color meshes</label>
   <label><input type="checkbox" bind:checked={showGrid} /> Grid</label>
