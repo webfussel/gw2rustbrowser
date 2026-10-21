@@ -8,7 +8,9 @@ pub mod granny;
 pub mod image;
 pub mod model;
 pub mod pf;
+pub mod sequences;
 pub mod skeleton;
+pub mod stars;
 pub mod text;
 pub mod truetype;
 
@@ -45,6 +47,10 @@ pub fn convert(file_type: FileType, data: Vec<u8>) -> Result<Converted> {
         Kind::Text => Converted { data, extension: "txt" },
         Kind::Content => Converted { data: content::to_xml(&data)?.into_bytes(), extension: "xml" },
         Kind::Font => Converted { data, extension: "ttf" },
+        Kind::Sequences => {
+            Converted { data: sequences::to_json(&sequences::decode(&data)?).into_bytes(), extension: "json" }
+        }
+        Kind::StarField => Converted { data: stars::to_csv(&stars::decode(&data)?).into_bytes(), extension: "csv" },
         Kind::Model => Converted { data: model::to_obj(&model::decode(&data)?, "").into_bytes(), extension: "obj" },
         _ => Converted { data, extension: file_type.extension() },
     };
@@ -83,6 +89,8 @@ pub fn converted_extension(file_type: FileType) -> &'static str {
             Kind::Content => "xml",
             Kind::BitmapFont | Kind::FontGlyphs => "png",
             Kind::Font => "ttf",
+            Kind::StarField => "csv",
+            Kind::Sequences => "json",
             _ => file_type.extension(),
         },
     }

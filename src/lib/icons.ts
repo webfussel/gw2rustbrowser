@@ -27,6 +27,7 @@ import {
   ListVideo,
   Map,
   MapPin,
+  MoonStar,
   Mic,
   Mountain,
   Network,
@@ -101,6 +102,7 @@ const byType: Record<string, IconSpec> = {
   mMet: spec(MapPin, "map", "Map metadata"),
   PIMG: spec(Grid3x3, "map", "Paged image table"),
   prlt: spec(DoorOpen, "map", "Portal manifest"),
+  STAR: spec(MoonStar, "map", "Star field (night sky)"),
 
   strs: spec(Languages, "text", "Strings"),
   eula: spec(Scale, "text", "License agreement"),
@@ -150,6 +152,8 @@ const byKind: Record<string, IconSpec> = {
   bitmapfont: spec(Type, "font", "Fonts"),
   fontglyphs: spec(CaseSensitive, "font", "Font glyphs"),
   font: spec(Type, "font", "Fonts"),
+  starfield: spec(MoonStar, "map", "Star fields"),
+  sequences: spec(ListVideo, "animation", "Animation sequences"),
   binary: spec(Binary, "code", "Binary data"),
 };
 

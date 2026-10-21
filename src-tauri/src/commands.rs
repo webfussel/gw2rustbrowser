@@ -560,6 +560,37 @@ fn decode_text(bytes: &[u8]) -> String {
     }
 }
 
+/// The animation sequence table as JSON (same form as the export).
+#[tauri::command]
+pub async fn load_sequences(app: AppHandle, mft: u32) -> CmdResult<Response> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        let data = session.read(mft).map_err(err)?;
+        let table = formats::sequences::decode(&data).map_err(err)?;
+        Ok(Response::new(formats::sequences::to_json(&table).into_bytes()))
+    })
+    .await
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StarFieldDto {
+    header: f32,
+    /// Six values per star, see `gw2dat::formats::stars`.
+    stars: Vec<f32>,
+}
+
+#[tauri::command]
+pub async fn load_stars(app: AppHandle, mft: u32) -> CmdResult<StarFieldDto> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        let data = session.read(mft).map_err(err)?;
+        let field = formats::stars::decode(&data).map_err(err)?;
+        Ok(StarFieldDto { header: field.header, stars: field.stars.into_iter().flatten().collect() })
+    })
+    .await
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrueTypeDto {

@@ -47,6 +47,8 @@ pub fn run() {
             commands::model_clip,
             commands::font_atlas,
             commands::truetype_info,
+            commands::load_stars,
+            commands::load_sequences,
             commands::glyph_file_info,
             commands::glyph_file_atlas,
             commands::suggest_file_name,

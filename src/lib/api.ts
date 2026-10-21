@@ -55,6 +55,8 @@ export type Kind =
   | "bitmapfont"
   | "fontglyphs"
   | "font"
+  | "starfield"
+  | "sequences"
   | "binary";
 
 export interface FindResult extends FileInfo {
@@ -167,6 +169,44 @@ export interface AnimationInfo {
   chunkVersion: number;
   dataSize: number;
   relocations: number;
+}
+
+export interface SequenceStep {
+  /** 0 = action, 1 = movement. */
+  kind: number;
+  durationMs: number;
+  animationSpeed: number;
+  flags: number;
+  moveRotation?: number[];
+  facingRotation?: number[];
+  velocity?: number[];
+}
+
+export interface SequenceTrigger {
+  kind: number;
+  timeMs: number;
+  flags: number;
+}
+
+export interface SequenceVariant {
+  name: string;
+  flags: number;
+  blendIn: number;
+  blendOut: number;
+  steps: SequenceStep[];
+  triggers: SequenceTrigger[];
+  chargeStages: { duration: number; level: number }[];
+}
+
+export interface AnimSequence {
+  name: string;
+  variants: SequenceVariant[];
+}
+
+export interface StarFieldData {
+  header: number;
+  /** Six values per star: azimuth, elevation, value 2, brightness, value 4, value 5. */
+  stars: number[];
 }
 
 export interface TrueTypeInfo {
@@ -295,6 +335,9 @@ export const api = {
   loadTexture: async (fileId: number) => parseImage(await invoke<ArrayBuffer>("load_texture", { fileId })),
   loadText: (mft: number) => invoke<string>("load_text", { mft }),
   loadAnimation: (mft: number) => invoke<AnimationInfo>("load_animation", { mft }),
+  loadSequences: async (mft: number): Promise<AnimSequence[]> =>
+    JSON.parse(new TextDecoder().decode(await invoke<ArrayBuffer>("load_sequences", { mft }))),
+  loadStars: (mft: number) => invoke<StarFieldData>("load_stars", { mft }),
   truetypeInfo: (mft: number) => invoke<TrueTypeInfo>("truetype_info", { mft }),
   glyphFileInfo: (mft: number) => invoke<GlyphFileInfo>("glyph_file_info", { mft }),
   glyphFileAtlas: async (mft: number, page: number) => {

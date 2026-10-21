@@ -61,7 +61,7 @@ file_types! {
 
     Pf => "PF", "pf", Binary, ["Misc"];
     Manifest => "ARMF", "armf", Binary, ["Manifests"];
-    TextPackManifest => "txtm", "txtm", Binary, ["TextPack Manifests"];
+    TextPackManifest => "txtm", "txtm", Binary, ["Manifests", "TextPack"];
     TextPackVariant => "txtV", "txtv", Binary, ["TextPack Variant"];
     TextPackVoices => "txtv", "txtvoice", Binary, ["TextPack Voices"];
     Bank => "ABNK", "abnk", SoundBank, ["Soundbank"];
@@ -76,11 +76,12 @@ file_types! {
     ModelEmpty => "MODL empty", "modl", Model, ["Models", "Empty"];
     ModelAnimation => "MODL anim", "modl", Animation, ["Models", "Animations"];
     BoneScale => "bone", "bone", Binary, ["Models", "Bone scales"];
-    ModelCollisionManifest => "cmaC", "cmac", Binary, ["Model Collision Manifest"];
+    StarField => "STAR", "star", StarField, ["Star fields"];
+    ModelCollisionManifest => "cmaC", "cmac", Binary, ["Manifests", "Model Collision"];
     DependencyTable => "DEPS", "deps", Binary, ["Dependency Tables"];
     Eula => "eula", "eula", Eula, ["EULA"];
     GameContent => "cntc", "cntc", Content, ["Game Content"];
-    GameContentPortalManifest => "prlt", "prlt", Binary, ["Game Content Portal Manifest"];
+    GameContentPortalManifest => "prlt", "prlt", Binary, ["Manifests", "Game Content Portal"];
     MapCollision => "hvkC", "hvkc", Binary, ["Map Collision"];
     MapParam => "mapc", "mapc", Binary, ["Map"];
     MapShadow => "mpsd", "mpsd", Binary, ["Map Shadow"];
@@ -89,7 +90,7 @@ file_types! {
     Material => "AMAT", "amat", Binary, ["Materials"];
     Composite => "cmpc", "cmpc", Binary, ["Composite Data"];
     Cinematic => "CINP", "cinp", Binary, ["Cinematics"];
-    AnimSequences => "anic", "anic", Binary, ["Animation Sequences"];
+    AnimSequences => "anic", "anic", Sequences, ["Animation Sequences"];
     EmoteAnimation => "emoc", "emoc", Binary, ["Emote Animations"];
     ShaderCache => "CDHS", "cdhs", Binary, ["Shader Cache"];
     Config => "locl", "locl", Binary, ["Configuration"];
@@ -125,6 +126,10 @@ pub enum Kind {
     FontGlyphs,
     /// TrueType font.
     Font,
+    /// Stars of the night sky.
+    StarField,
+    /// How game actions play their animations.
+    Sequences,
     Binary,
 }
 
@@ -186,6 +191,7 @@ const PF_TYPES: &[(u32, FileType)] = &[
     (fcc(b"locl"), FileType::Config),
     (fcc(b"AFNT"), FileType::BitmapFont),
     (fcc(b"bone"), FileType::BoneScale),
+    (fcc(b"STAR"), FileType::StarField),
 ];
 
 /// Bytes read from the start of every entry while scanning. Enough for all
