@@ -25,11 +25,12 @@ aware of it.
 **If you want to support anything here, support the original projects** —
 star them, contribute to them, credit them. Not this vibe-coded slop. And
 yes, that includes the text you are reading right now: **even this README was
-generated.**
+generated - except for this prologue.**
 
 In the end, I just wanted to provide a fast and stable tool to the community,
-so that maybe more people can do datamining and it becomes more popular.
+so that maybe more people can do datamining, and it becomes more popular.
 
+# Readme
 Rust port of [Gw2Browser](https://github.com/kytulendu/gw2browser): opens the
 `Gw2.dat` of Guild Wars 2, shows its contents and exports them.
 
