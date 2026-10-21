@@ -61,9 +61,9 @@ file_types! {
 
     Pf => "PF", "pf", Binary, ["Misc"];
     Manifest => "ARMF", "armf", Binary, ["Manifests"];
-    TextPackManifest => "txtm", "txtm", Binary, ["Manifests", "TextPack"];
-    TextPackVariant => "txtV", "txtv", Binary, ["TextPack Variant"];
-    TextPackVoices => "txtv", "txtvoice", Binary, ["TextPack Voices"];
+    TextPackManifest => "txtm", "txtm", TextPack, ["Manifests", "TextPack"];
+    TextPackVariant => "txtV", "txtv", TextPack, ["TextPack", "Variant"];
+    TextPackVoices => "txtv", "txtvoice", TextPack, ["TextPack", "Voices"];
     Bank => "ABNK", "abnk", SoundBank, ["Soundbank"];
     BankIndex => "ABIX", "abix", Binary, ["Soundbank Index"];
     AudioScript => "AMSP", "amsp", Binary, ["Audio Scripts"];
@@ -130,6 +130,8 @@ pub enum Kind {
     StarField,
     /// How game actions play their animations.
     Sequences,
+    /// Text index, text variants and voice lines.
+    TextPack,
     Binary,
 }
 

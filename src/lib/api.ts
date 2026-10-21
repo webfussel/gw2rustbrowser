@@ -57,6 +57,7 @@ export type Kind =
   | "font"
   | "starfield"
   | "sequences"
+  | "textpack"
   | "binary";
 
 export interface FindResult extends FileInfo {
@@ -169,6 +170,28 @@ export interface AnimationInfo {
   chunkVersion: number;
   dataSize: number;
   relocations: number;
+}
+
+export interface TextRow {
+  id: number;
+  text: string | null;
+  state: "plain" | "encrypted" | "missing";
+  voice: number | null;
+  /** null while the voice index is not built. */
+  playable: boolean | null;
+}
+
+export interface VariantRow extends TextRow {
+  variants: TextRow[];
+}
+
+export interface TextPackInfo {
+  languages: { index: number; name: string }[];
+  textCount: number;
+  stringsPerFile: number;
+  variantCount: number;
+  voiceCount: number;
+  voiceIndexReady: boolean;
 }
 
 export interface SequenceStep {
@@ -335,6 +358,15 @@ export const api = {
   loadTexture: async (fileId: number) => parseImage(await invoke<ArrayBuffer>("load_texture", { fileId })),
   loadText: (mft: number) => invoke<string>("load_text", { mft }),
   loadAnimation: (mft: number) => invoke<AnimationInfo>("load_animation", { mft }),
+  textpackInfo: () => invoke<TextPackInfo>("textpack_info"),
+  textRows: (language: number, start: number, count: number) => invoke<TextRow[]>("text_rows", { language, start, count }),
+  variantRows: (language: number, start: number, count: number) =>
+    invoke<VariantRow[]>("variant_rows", { language, start, count }),
+  voiceRows: (language: number, start: number, count: number, playableOnly: boolean) =>
+    invoke<{ total: number; rows: TextRow[] }>("voice_rows", { language, start, count, playableOnly }),
+  searchTexts: (language: number, query: string) => invoke<TextRow[]>("search_texts", { language, query }),
+  buildVoiceIndex: () => invoke<{ entries: number; playable: number }>("build_voice_index"),
+  playVoice: async (voice: number) => parseSound(await invoke<ArrayBuffer>("play_voice", { voice })),
   loadSequences: async (mft: number): Promise<AnimSequence[]> =>
     JSON.parse(new TextDecoder().decode(await invoke<ArrayBuffer>("load_sequences", { mft }))),
   loadStars: (mft: number) => invoke<StarFieldData>("load_stars", { mft }),

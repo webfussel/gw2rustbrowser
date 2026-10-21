@@ -17,6 +17,7 @@
   import GlyphFileViewer from "./viewers/GlyphFileViewer.svelte";
   import StarFieldViewer from "./viewers/StarFieldViewer.svelte";
   import SequenceViewer from "./viewers/SequenceViewer.svelte";
+  import TextPackViewer from "./viewers/TextPackViewer.svelte";
 
   /** Model types without meshes get a summary instead of the 3D view. */
   const meshlessModels = ["MODL skeleton", "MODL animset", "MODL materials", "MODL empty"];
@@ -44,6 +45,7 @@
     "font",
     "starfield",
     "sequences",
+    "textpack",
   ];
   const hasPreview = $derived(detail !== null && previewKinds.includes(detail.kind));
   const activeTab = $derived<Tab>(hasPreview ? tab : "hex");
@@ -139,6 +141,8 @@
         <FontViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "font"}
         <TrueTypeViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "textpack"}
+        <TextPackViewer type={d.type} />
       {:else if activeTab === "preview" && d.kind === "sequences"}
         <SequenceViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "starfield"}

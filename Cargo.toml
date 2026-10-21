@@ -12,3 +12,7 @@ opt-level = 3
 
 [profile.dev]
 opt-level = 1
+# Incremental builds repeatedly left stale artifacts behind ("undefined hidden
+# symbol ... .llvm.*" at link time). The workspace crates are small enough to
+# rebuild in full.
+incremental = false

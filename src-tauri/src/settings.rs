@@ -23,6 +23,11 @@ pub fn set_last_dat(app: &AppHandle, path: &Path) {
     let _ = std::fs::write(file, value.to_string());
 }
 
+/// Cache file for the voice index of an archive.
+pub fn voice_cache(app: &AppHandle, dat: &Path) -> Option<PathBuf> {
+    Some(index_cache(app, dat)?.with_extension("voices"))
+}
+
 /// One cache file per archive path (FNV-1a hash, stable across builds).
 pub fn index_cache(app: &AppHandle, dat: &Path) -> Option<PathBuf> {
     let dir = app.path().app_cache_dir().ok()?;

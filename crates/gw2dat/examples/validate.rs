@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 use std::time::Instant;
 
-use gw2dat::formats::{animation, audio, content, font, image, model, sequences, stars, text, truetype};
+use gw2dat::formats::{animation, audio, content, font, image, model, sequences, stars, text, textpack, truetype};
 use gw2dat::{Archive, FileType, Index, Kind, ScanProgress};
 use rayon::prelude::*;
 
@@ -76,6 +76,12 @@ fn main() -> gw2dat::Result<()> {
             Kind::Font => truetype::info(&data).map(|_| ()).map_err(|e| e.to_string()),
             Kind::StarField => stars::decode(&data).map(|_| ()).map_err(|e| e.to_string()),
             Kind::Sequences => sequences::decode(&data).map(|_| ()).map_err(|e| e.to_string()),
+            Kind::TextPack => match e.file_type {
+                FileType::TextPackManifest => textpack::manifest(&data).map(|_| ()),
+                FileType::TextPackVariant => textpack::variants(&data).map(|_| ()),
+                _ => textpack::voices(&data).map(|_| ()),
+            }
+            .map_err(|e| e.to_string()),
             // Glyph files need their character range from the font file; the
             // fonts are checked through `Kind::BitmapFont`.
             Kind::FontGlyphs | Kind::Text => Ok(()),

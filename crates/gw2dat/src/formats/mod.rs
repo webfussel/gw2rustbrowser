@@ -12,6 +12,7 @@ pub mod sequences;
 pub mod skeleton;
 pub mod stars;
 pub mod text;
+pub mod textpack;
 pub mod truetype;
 
 use crate::error::Result;

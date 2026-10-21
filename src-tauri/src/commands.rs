@@ -560,6 +560,154 @@ fn decode_text(bytes: &[u8]) -> String {
     }
 }
 
+#[tauri::command]
+pub async fn textpack_info(app: AppHandle) -> CmdResult<crate::texts::TextPackInfo> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        crate::texts::info(&session.texts, &session)
+    })
+    .await
+}
+
+/// Texts with ids `start..start + count`.
+#[tauri::command]
+pub async fn text_rows(
+    app: AppHandle,
+    language: usize,
+    start: u32,
+    count: u32,
+) -> CmdResult<Vec<crate::texts::TextRow>> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        let texts = session.texts.texts(&session)?;
+        let voices = session.texts.voice_index();
+        let end = start.saturating_add(count.min(1000)).min(texts.manifest.text_count());
+        Ok((start..end).map(|id| crate::texts::row(&session, &texts, voices.as_deref(), language, id)).collect())
+    })
+    .await
+}
+
+/// Texts with the given ids (search results).
+#[tauri::command]
+pub async fn search_texts(app: AppHandle, language: usize, query: String) -> CmdResult<Vec<crate::texts::TextRow>> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        let texts = session.texts.texts(&session)?;
+        let voices = session.texts.voice_index();
+        let ids = crate::texts::search(&session, &texts, language, &query, 2000);
+        Ok(ids.into_iter().map(|id| crate::texts::row(&session, &texts, voices.as_deref(), language, id)).collect())
+    })
+    .await
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VariantRow {
+    #[serde(flatten)]
+    text: crate::texts::TextRow,
+    variants: Vec<crate::texts::TextRow>,
+}
+
+#[tauri::command]
+pub async fn variant_rows(app: AppHandle, language: usize, start: usize, count: usize) -> CmdResult<Vec<VariantRow>> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        let texts = session.texts.texts(&session)?;
+        let voices = session.texts.voice_index();
+        let row = |id| crate::texts::row(&session, &texts, voices.as_deref(), language, id);
+        Ok(texts
+            .variants
+            .iter()
+            .skip(start)
+            .take(count.min(500))
+            .map(|(id, variants)| {
+                // The lists repeat their entries; show each variant once.
+                let mut unique = variants.clone();
+                unique.dedup();
+                let mut seen = std::collections::HashSet::new();
+                unique.retain(|v| seen.insert(*v));
+                VariantRow { text: row(*id), variants: unique.into_iter().map(row).collect() }
+            })
+            .collect())
+    })
+    .await
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoicePage {
+    /// Number of voice lines matching the filter.
+    total: usize,
+    rows: Vec<crate::texts::TextRow>,
+}
+
+/// Voice lines `start..start + count` of the voices table, optionally only
+/// those with playable audio (once the voice index is built).
+#[tauri::command]
+pub async fn voice_rows(
+    app: AppHandle,
+    language: usize,
+    start: usize,
+    count: usize,
+    playable_only: bool,
+) -> CmdResult<VoicePage> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        let texts = session.texts.texts(&session)?;
+        let voices = session.texts.voice_index();
+        let lines: Vec<u32> = match (&voices, playable_only) {
+            (Some(index), true) => {
+                texts.voices.iter().filter(|(_, v)| index.get(v).is_some_and(|e| e.2)).map(|(id, _)| *id).collect()
+            }
+            _ => texts.voices.iter().map(|(id, _)| *id).collect(),
+        };
+        let rows = lines
+            .iter()
+            .skip(start)
+            .take(count.min(1000))
+            .map(|id| crate::texts::row(&session, &texts, voices.as_deref(), language, *id))
+            .collect();
+        Ok(VoicePage { total: lines.len(), rows })
+    })
+    .await
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceIndexDto {
+    entries: usize,
+    playable: usize,
+}
+
+/// Builds the voice id -> sound bank index (cached on disk).
+#[tauri::command]
+pub async fn build_voice_index(app: AppHandle) -> CmdResult<VoiceIndexDto> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        let cache = settings::voice_cache(&app, session.archive.path());
+        let index = session.texts.ensure_voice_index(&session, cache.as_deref());
+        Ok(VoiceIndexDto { entries: index.len(), playable: index.values().filter(|e| e.2).count() })
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn play_voice(app: AppHandle, voice: u32) -> CmdResult<Response> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        let index = session.texts.voice_index().ok_or("The voice index is not built yet")?;
+        let &(mft, entry, _) = index.get(&voice).ok_or("No sound bank has this voice line")?;
+        let data = session.archive.read(mft).map_err(err)?;
+        let found = formats::audio::decode_bank(&data)
+            .map_err(err)?
+            .into_iter()
+            .find(|e| e.index == entry)
+            .ok_or("Sound bank entry missing")?;
+        Ok(sound_response(found.sound.map_err(err)?))
+    })
+    .await
+}
+
 /// The animation sequence table as JSON (same form as the export).
 #[tauri::command]
 pub async fn load_sequences(app: AppHandle, mft: u32) -> CmdResult<Response> {

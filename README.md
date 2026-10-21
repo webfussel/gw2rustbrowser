@@ -39,6 +39,7 @@ the window.
 | TrueType fonts (10 files) | Specimen in the font itself: sample text in several sizes, every mapped character | TTF |
 | Star fields (STAR, 2 files) | Sky chart (dome or panorama), stars sized by brightness, colouring by the unknown values, values on hover | CSV |
 | Animation sequences (anic) | Searchable table of 1,853 sequences / 8,858 variants: steps, movement, blend times, timeline with triggers, charge stages | JSON |
+| TextPack (txtm manifest, txtV variants, txtv voices) | Every game text by ID and language, full-text search, jump to ID; text variants side by side; voice lines with playback from the sound banks (only playable by default) | raw |
 | Text, everything else | Text or hex view | raw |
 
 Every file can also be exported raw (decompressed). Whole categories or search
@@ -145,7 +146,11 @@ GW2_DAT=$PWD/res/Gw2.dat cargo test --release -p gw2dat --test real_archive
 ## Known limitations
 
 - Encrypted content (most sound bank entries, some strings) cannot be read.
-  The keys come from the game server.
+  The keys come from the game server. This includes the dialogue texts: of
+  256,169 voiced texts only one is readable, and 207,236 of 1.2 million English
+  texts are readable in total.
+- The first time a TextPack voices file is opened, all sound banks are scanned
+  for voice IDs (~20 s); the result is cached next to the index cache.
 - Map files, animations, skeletons and collision data are only listed and
   exported raw. The original could not display them either.
 - The 3D view shows diffuse textures only. Materials (AMAT shaders) are not

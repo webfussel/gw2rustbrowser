@@ -79,6 +79,12 @@ pub fn decode(data: &[u8]) -> Result<Sound> {
 
 /// PF `ASND` file: one waveform chunk.
 pub fn decode_packed(data: &[u8]) -> Result<Sound> {
+    let (codec, stream, length) = packed_stream(data)?;
+    Ok(Sound { codec, data: stream.to_vec(), length_seconds: Some(length) })
+}
+
+/// The playable stream inside a PF `ASND` file, without copying it.
+fn packed_stream(data: &[u8]) -> Result<(Codec, &[u8], f32)> {
     let file = PackFile::parse(data)?;
     let chunk = file.require_chunk(pf::ASND)?;
     if chunk.version != 2 {
@@ -98,7 +104,7 @@ pub fn decode_packed(data: &[u8]) -> Result<Sound> {
         Codec::Unknown(byte) => Error::Unsupported(format!("audio codec {byte}")),
         _ => Error::Unsupported("encrypted audio".into()),
     })?;
-    Ok(Sound { codec, data: stream.to_vec(), length_seconds: Some(length) })
+    Ok((codec, stream, length))
 }
 
 #[derive(Debug)]
@@ -135,6 +141,28 @@ pub fn decode_bank(data: &[u8]) -> Result<Vec<BankEntry>> {
         entries.push(BankEntry { voice_id, index, sound });
     }
     Ok(entries)
+}
+
+/// Voice ids of a sound bank's entries: `(voice id, entry index, playable)`.
+/// Cheap: the audio streams are inspected, not copied.
+pub fn bank_voices(data: &[u8]) -> Result<Vec<(u32, usize, bool)>> {
+    let file = PackFile::parse(data)?;
+    if file.file_type != pf::ABNK {
+        return Err(Error::format("sound bank", "not an ABNK file"));
+    }
+    let mut c = file.require_chunk(pf::BKCK)?.cursor();
+    c.skip(16)?;
+    let (count, mut item) = c.array()?;
+    let mut voices = Vec::with_capacity(count.min(4096));
+    for index in 0..count {
+        let voice_id = item.u32()?;
+        item.skip(4 * 5 + 8 + 4)?;
+        let audio = item.byte_array()?;
+        if !audio.is_empty() {
+            voices.push((voice_id, index, audio.starts_with(b"PF") && packed_stream(audio).is_ok()));
+        }
+    }
+    Ok(voices)
 }
 
 pub const ASND_MAGIC: u32 = fcc(b"asnd");

@@ -5,6 +5,7 @@ mod model_export;
 mod rig;
 mod session;
 mod settings;
+mod texts;
 
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, RwLock};
@@ -49,6 +50,13 @@ pub fn run() {
             commands::truetype_info,
             commands::load_stars,
             commands::load_sequences,
+            commands::textpack_info,
+            commands::text_rows,
+            commands::variant_rows,
+            commands::voice_rows,
+            commands::search_texts,
+            commands::build_voice_index,
+            commands::play_voice,
             commands::glyph_file_info,
             commands::glyph_file_atlas,
             commands::suggest_file_name,

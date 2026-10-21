@@ -20,6 +20,8 @@ pub struct Session {
     by_mft: HashMap<u32, u32>,
     /// Number of models bound to each skeleton id.
     pub skeleton_users: HashMap<u32, u32>,
+    /// Game texts and voice lines, loaded on first use.
+    pub texts: crate::texts::TextState,
     /// The most recently read file; previews read the same file repeatedly.
     recent: Mutex<Option<(u32, Arc<Vec<u8>>)>>,
 }
@@ -76,7 +78,18 @@ impl Session {
         for e in index.entries.iter().filter(|e| e.reference != 0) {
             *skeleton_users.entry(e.reference).or_default() += 1;
         }
-        Session { archive, index, children, files, totals, content, by_mft, skeleton_users, recent: Mutex::new(None) }
+        Session {
+            archive,
+            index,
+            children,
+            files,
+            totals,
+            content,
+            by_mft,
+            skeleton_users,
+            texts: Default::default(),
+            recent: Mutex::new(None),
+        }
     }
 
     pub fn entry(&self, mft_index: u32) -> Option<&IndexEntry> {
