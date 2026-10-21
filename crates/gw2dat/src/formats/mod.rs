@@ -3,6 +3,8 @@
 pub mod animation;
 pub mod audio;
 pub mod audio_script;
+pub mod collision;
+pub mod composite;
 pub mod content;
 pub mod emotes;
 pub mod font;
@@ -10,6 +12,7 @@ pub mod granny;
 pub mod image;
 pub mod manifests;
 pub mod map;
+pub mod map_data;
 pub mod material;
 pub mod model;
 pub mod paged_image;
@@ -75,6 +78,16 @@ pub fn convert(file_type: FileType, data: Vec<u8>) -> Result<Converted> {
             data: manifests::portal_csv(&manifests::portal_manifest(&data)?).into_bytes(),
             extension: "csv",
         },
+        Kind::Collision => {
+            Converted { data: collision::to_obj(&collision::decode(&data)?).into_bytes(), extension: "obj" }
+        }
+        Kind::MapShadow => {
+            Converted { data: map_data::shadow_image(&map_data::shadow(&data)?).to_png()?, extension: "png" }
+        }
+        Kind::MapMetadata => {
+            let rows: String = map_data::metadata(&data)?.iter().map(|(id, kind)| format!("{id},{kind}\n")).collect();
+            Converted { data: format!("map_id,map_type\n{rows}").into_bytes(), extension: "csv" }
+        }
         Kind::Map => Converted { data: map::heightmap_png(&map::decode(&data)?)?, extension: "png" },
         Kind::Material => {
             Converted { data: material::to_text(&material::decode(&data)?).into_bytes(), extension: "txt" }
@@ -119,7 +132,9 @@ pub fn converted_extension(file_type: FileType) -> &'static str {
             Kind::Font => "ttf",
             Kind::StarField => "csv",
             Kind::Sequences => "json",
-            Kind::Map => "png",
+            Kind::Map | Kind::MapShadow => "png",
+            Kind::Collision => "obj",
+            Kind::MapMetadata => "csv",
             Kind::CollisionManifest | Kind::PortalManifest => "csv",
             Kind::Emotes => "csv",
             Kind::AudioScript => "txt",

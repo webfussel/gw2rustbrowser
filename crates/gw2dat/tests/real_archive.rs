@@ -4,7 +4,10 @@
 
 use std::collections::HashMap;
 
-use gw2dat::formats::{audio, audio_script, emotes, image, manifests, map, material, model, paged_image, shader, text};
+use gw2dat::formats::{
+    audio, audio_script, collision, composite, emotes, image, manifests, map, map_data, material, model, paged_image,
+    shader, text,
+};
 use gw2dat::{Archive, FileType, Index, Kind, ScanProgress};
 
 fn archive() -> Option<Archive> {
@@ -47,6 +50,24 @@ fn decodes_a_sample_of_every_kind() {
                     }
                     assert!(model::materials(&data).is_ok(), "materials {id}");
                 }
+            }
+            Kind::Composite => {
+                let c = composite::decode(&data).unwrap_or_else(|e| panic!("cmpc {id}: {e}"));
+                assert!(c.races.iter().any(|r| r.name == "HumanFemale"), "cmpc {id} races");
+            }
+            Kind::Collision => {
+                collision::decode(&data).unwrap_or_else(|e| panic!("hvkC {id}: {e}"));
+            }
+            Kind::MapShadow => {
+                let s = map_data::shadow(&data).unwrap_or_else(|e| panic!("mpsd {id}: {e}"));
+                assert_eq!(
+                    s.tiles.len() as u32,
+                    s.width.div_ceil(s.tile_width) * s.height.div_ceil(s.tile_height),
+                    "mpsd {id}"
+                );
+            }
+            Kind::MapMetadata => {
+                assert!(!map_data::metadata(&data).unwrap_or_else(|e| panic!("mMet {id}: {e}")).is_empty());
             }
             Kind::CollisionManifest => {
                 let entries = manifests::collision_manifest(&data).unwrap_or_else(|e| panic!("cmaC {id}: {e}"));
@@ -107,6 +128,10 @@ fn decodes_a_sample_of_every_kind() {
         FileType::EmoteAnimation,
         FileType::ModelCollisionManifest,
         FileType::GameContentPortalManifest,
+        FileType::MapCollision,
+        FileType::MapShadow,
+        FileType::MapMetadata,
+        FileType::Composite,
     ] {
         assert!(seen.contains_key(&kind), "no {kind:?} found");
     }

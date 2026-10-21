@@ -44,6 +44,10 @@ the window.
 | Emote animations (emoc, 1 file, 314 emotes) | Searchable emote list; per emote its variants (one per body type, mount or prop) with the animation file (jump to it), intro/loop/outro timeline, blend times, start offset; the selected variant's model in 3D or its summary | CSV |
 | Model collision manifest (cmaC, 1 file) | Searchable list of 9,188 models with collision: original asset path from development, model and collision file (jump to them) | CSV |
 | Portal manifests (prlt, 89 files) | Maps by GUID with their start points (position, radius, models by type) and exits; the models loaded for a start point, filterable by type, with links | CSV |
+| Collision (hvkC, 9,188 files) | 3D view of the Havok collision meshes and blockers in model units, per collision state (animation sequence), with the model it belongs to overlaid | OBJ |
+| Map shadows (mpsd, 279 files) | Shadow map image with tile counts and sun position; detailed tiles are shown at the middle of their value range (their per-pixel encoding is not decoded) | PNG |
+| Map metadata (mMet, 1 file) | All 1,244 map ids with their map type, filterable | CSV |
+| Character composition (cmpc, 1 file) | Per race and sex (29): skeleton, colour palettes, body shapes, faces, hair styles, beards, ears, skin patterns, animation overrides; every body and armour part with mesh, texture, normal map and dye masks (mesh in 3D and texture side by side); NPC preset variants with their parts and colour adjustments; armour texture atlas layouts | raw |
 | Maps (mapc, 287 files) | 3D view: terrain heightmap coloured by height and slope, sea level and lakes, props as textured models (loaded within a draw distance around the focus point with markers for the rest, or all at once); click a prop for its model id; size, prop and chunk overview | 16-bit heightmap PNG |
 | Materials (AMAT, 2,854 files) | Texture slots, techniques with their passes and effects (render state decoded: blending, depth, culling), sampler states; per shader: uniforms with registers, input/output signatures, vertex attributes, texture bindings and a shader model 5 disassembly annotated with uniform names | TXT (everything incl. disassembly) |
 | World map tiles (PIMG, 3,298 files, under Maps) | Pan and zoom like a map: an overview of the whole layer, sharper pages load as you zoom in (up to the full 512×512 per page); layers, page and texture under the cursor | PNG of a layer at a chosen pixels-per-page |
@@ -151,7 +155,7 @@ crates/gw2dat/            core library
   src/inflate/            Huffman/LZ decompression (.dat) and texture decompression
   src/filetype.rs         type detection and categories (table-driven)
   src/index.rs            parallel scan, incremental cache
-  src/formats/            pf (PF container), image, audio, audio_script, emotes, manifests, model, map, material, paged_image, shader, text, font, content
+  src/formats/            pf (PF container), image, audio, audio_script, collision, composite, emotes, manifests, model, map, map_data, material, paged_image, shader, text, font, content
   examples/               developer tools (see below)
   tests/real_archive.rs   tests against a real Gw2.dat
 src-tauri/                Tauri backend (commands, export)
@@ -188,9 +192,8 @@ GW2_DAT=$PWD/res/Gw2.dat cargo test --release -p gw2dat --test real_archive
   texts are readable in total.
 - The first time a TextPack voices file is opened, all sound banks are scanned
   for voice IDs (~20 s); the result is cached next to the index cache.
-- Map collision, map shadow and map metadata files, skeletons and model
-  collision data are only listed and exported raw. The original could not
-  display them either.
+- Skeletons are only summarised. Detailed map shadow tiles are decompressed,
+  but how their 64×64 16-bit samples are encoded is not known yet.
 - The map view colours the terrain by height; the terrain's own texture
   layers (`trni`, paged images) and lights, decals and zones are not drawn yet.
 - The 3D view shows diffuse textures only. Materials (AMAT shaders) are not

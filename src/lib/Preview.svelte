@@ -14,6 +14,9 @@
   import EmoteViewer from "./viewers/EmoteViewer.svelte";
   import CollisionManifestViewer from "./viewers/CollisionManifestViewer.svelte";
   import PortalManifestViewer from "./viewers/PortalManifestViewer.svelte";
+  import ShadowViewer from "./viewers/ShadowViewer.svelte";
+  import MapMetadataViewer from "./viewers/MapMetadataViewer.svelte";
+  import CompositeViewer from "./viewers/CompositeViewer.svelte";
   import StringsViewer from "./viewers/StringsViewer.svelte";
   import EulaViewer from "./viewers/EulaViewer.svelte";
   import FontViewer from "./viewers/FontViewer.svelte";
@@ -32,6 +35,7 @@
   // three.js is large; load the 3D viewer only when a model is shown.
   const modelViewer = () => import("./viewers/ModelViewer.svelte");
   const mapViewer = () => import("./viewers/MapViewer.svelte");
+  const collisionViewer = () => import("./viewers/CollisionViewer.svelte");
 
   type Tab = "preview" | "hex";
 
@@ -51,6 +55,10 @@
     "emotes",
     "collisionmanifest",
     "portalmanifest",
+    "collision",
+    "mapshadow",
+    "mapmetadata",
+    "composite",
     "strings",
     "eula",
     "model",
@@ -147,6 +155,16 @@
         <TextViewer mft={d.mft} language={d.kind === "content" ? "xml" : languageFor(d.path)} />
       {:else if activeTab === "preview" && d.kind === "sound"}
         <SoundPlayer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "collision"}
+        {#await collisionViewer() then { default: CollisionViewer }}
+          <CollisionViewer mft={d.mft} />
+        {/await}
+      {:else if activeTab === "preview" && d.kind === "mapshadow"}
+        <ShadowViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "composite"}
+        <CompositeViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "mapmetadata"}
+        <MapMetadataViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "collisionmanifest"}
         <CollisionManifestViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "portalmanifest"}

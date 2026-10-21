@@ -82,13 +82,13 @@ file_types! {
     Eula => "eula", "eula", Eula, ["Texts", "EULA"];
     GameContent => "cntc", "cntc", Content, ["Texts", "Game Content"];
     GameContentPortalManifest => "prlt", "prlt", PortalManifest, ["Manifests", "Game Content Portal"];
-    MapCollision => "hvkC", "hvkc", Binary, ["Maps", "Collision"];
+    MapCollision => "hvkC", "hvkc", Collision, ["Maps", "Collision"];
     MapParam => "mapc", "mapc", Map, ["Maps"];
-    MapShadow => "mpsd", "mpsd", Binary, ["Maps", "Shadows"];
-    MapMetadata => "mMet", "mmet", Binary, ["Maps", "Metadata"];
+    MapShadow => "mpsd", "mpsd", MapShadow, ["Maps", "Shadows"];
+    MapMetadata => "mMet", "mmet", MapMetadata, ["Maps", "Metadata"];
     PagedImageTable => "PIMG", "pimg", PagedImage, ["Maps", "World Map Tiles"];
     Material => "AMAT", "amat", Material, ["Materials"];
-    Composite => "cmpc", "cmpc", Binary, ["Composite Data"];
+    Composite => "cmpc", "cmpc", Composite, ["Composite Data"];
     Cinematic => "CINP", "cinp", Binary, ["Cinematics"];
     AnimSequences => "anic", "anic", Sequences, ["Models", "Animation", "Animation sequences"];
     EmoteAnimation => "emoc", "emoc", Emotes, ["Models", "Animation", "Emote animations"];
@@ -127,6 +127,14 @@ pub enum Kind {
     CollisionManifest,
     /// Map start points and the models loaded there.
     PortalManifest,
+    /// Havok collision meshes of a model.
+    Collision,
+    /// Sun shadow over a map.
+    MapShadow,
+    /// Map ids and types.
+    MapMetadata,
+    /// How player characters are composed: races, parts, variants.
+    Composite,
     Model,
     Animation,
     Strings,

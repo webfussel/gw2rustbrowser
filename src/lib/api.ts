@@ -54,6 +54,10 @@ export type Kind =
   | "emotes"
   | "collisionmanifest"
   | "portalmanifest"
+  | "collision"
+  | "mapshadow"
+  | "mapmetadata"
+  | "composite"
   | "model"
   | "animation"
   | "strings"
@@ -372,6 +376,88 @@ function parseMap(buffer: ArrayBuffer): MapData {
     propModels: new Uint32Array(buffer, offset, header.propCount * 8),
     props: new Float32Array(buffer, offset, header.propCount * 8),
   };
+}
+
+export interface CompositeInfo {
+  version: number;
+  configVersion: number;
+  boneScales: number;
+  /** Rect corners: x0, y0, x1, y1. */
+  blitRects: { name: string; size: [number, number]; rects: [number, number, number, number][] }[];
+  races: { name: string; parts: number; variants: number; faces: number; hairStyles: number }[];
+}
+
+export interface CompositePart {
+  name: string;
+  kind: number;
+  flags: number;
+  mesh: FileRef | null;
+  meshOverlap: FileRef | null;
+  dyeMasks: (FileRef | null)[];
+  cutMask: FileRef | null;
+  texture: FileRef | null;
+  normal: FileRef | null;
+  blitRect: number;
+}
+
+/** brightness, contrast, hue, saturation, lightness (0–255 each). */
+export type CompositeColor = [number, number, number, number, number];
+
+export interface CompositeRace {
+  name: string;
+  skeleton: FileRef | null;
+  flags: number;
+  kind: number;
+  variantOf: string;
+  /** eye, hair, skin colour palette names. */
+  palettes: [string, string, string];
+  skinPatternPalette: string;
+  faces: string[];
+  hairStyles: string[];
+  beards: string[];
+  ears: string[];
+  skinStyles: string[][];
+  /** chest, face, feet, hands, legs, ears. */
+  skinPatterns: (FileRef | null)[][];
+  bodyShapes: string[];
+  faceBoneScales: number;
+  animOverrides: [string, FileRef | null][];
+  parts: CompositePart[];
+  variants: {
+    name: string;
+    boneScale: number;
+    /** eye, hair, hair 2, pattern, skin. */
+    colors: CompositeColor[];
+    components: [string, CompositeColor[]][];
+    skinIndex: number;
+    skinStyle: number;
+  }[];
+}
+
+export interface CollisionData {
+  /** Meshes with flat xyz vertices in the model's own space. */
+  meshes: { vertices: number[]; indices: number[] }[];
+  blockers: number[][];
+  animations: { name: string; meshes: number[]; blockers: number[] }[];
+  geometries: number;
+  surfaces: number;
+  obstacleModels: number;
+  propModels: number;
+  zoneModels: number;
+  waterVolumes: number;
+  model: { id: number; mft: number; fileType: string } | null;
+}
+
+export interface ShadowInfo {
+  width: number;
+  height: number;
+  tileWidth: number;
+  tileHeight: number;
+  uniformTiles: number;
+  detailTiles: number;
+  eye: [number, number, number];
+  direction: [number, number, number];
+  up: [number, number, number];
 }
 
 export interface FileRef {
@@ -707,6 +793,12 @@ export const api = {
   },
   modelMaterials: (mft: number) => invoke<ModelMaterial[]>("model_materials", { mft }),
   loadSound: async (mft: number) => parseSound(await invoke<ArrayBuffer>("load_sound", { mft })),
+  compositeInfo: (mft: number) => invoke<CompositeInfo>("composite_info", { mft }),
+  compositeRace: (mft: number, index: number) => invoke<CompositeRace>("composite_race", { mft, index }),
+  collisionInfo: (mft: number) => invoke<CollisionData>("collision_info", { mft }),
+  shadowInfo: (mft: number) => invoke<ShadowInfo>("shadow_info", { mft }),
+  shadowImage: async (mft: number) => parseImage(await invoke<ArrayBuffer>("shadow_image", { mft })),
+  mapMetadata: (mft: number) => invoke<[number, number][]>("map_metadata", { mft }),
   collisionManifest: (mft: number) => invoke<CollisionEntry[]>("collision_manifest_info", { mft }),
   portalManifest: (mft: number) => invoke<PortalMap[]>("portal_manifest_info", { mft }),
   portalStartModels: (mft: number, map: number, start: number) =>

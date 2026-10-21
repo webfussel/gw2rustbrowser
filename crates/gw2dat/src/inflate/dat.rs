@@ -396,6 +396,15 @@ fn inflate_into(bits: &mut BitReader, size: usize, output: &mut Vec<u8>) -> Resu
     Ok(())
 }
 
+/// Inflates a stream without the 8-byte header of archive entries, producing
+/// exactly `size` bytes (used inside some formats, e.g. map shadow tiles).
+pub fn inflate_raw(input: &[u8], size: usize) -> Result<Vec<u8>> {
+    let mut bits = BitReader::new(input, BLOCK_WORDS);
+    let mut output = Vec::with_capacity(size);
+    inflate_into(&mut bits, size, &mut output)?;
+    Ok(output)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

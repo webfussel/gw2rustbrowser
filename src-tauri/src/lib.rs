@@ -1,9 +1,11 @@
 mod audio_script_view;
 mod commands;
+mod composite_view;
 mod emote_view;
 mod export;
 mod font_export;
 mod manifest_view;
+mod map_extras_view;
 mod map_view;
 mod material_view;
 mod model_export;
@@ -42,8 +44,14 @@ pub fn run() {
             commands::load_bank,
             commands::load_bank_index,
             audio_script_view::audio_script_info,
+            composite_view::composite_info,
+            composite_view::composite_race,
             emote_view::emote_info,
             manifest_view::collision_manifest_info,
+            map_extras_view::collision_info,
+            map_extras_view::shadow_info,
+            map_extras_view::shadow_image,
+            map_extras_view::map_metadata,
             manifest_view::portal_manifest_info,
             manifest_view::portal_start_models,
             paged_image_view::paged_image_info,
