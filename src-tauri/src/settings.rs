@@ -1,11 +1,33 @@
 //! Small persisted settings (last opened archive) and the index cache location.
 
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use tauri::{AppHandle, Manager};
 
+/// Folder for settings, caches and the web view's data: `data` next to the
+/// executable, so an unpacked copy of the app keeps everything in its own
+/// folder. `None` when that folder cannot be written (e.g. a read-only
+/// install location); the per-user folders are used then.
+pub fn portable_dir() -> Option<&'static Path> {
+    static DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
+    DIR.get_or_init(|| {
+        let dir = std::env::current_exe().ok()?.parent()?.join("data");
+        std::fs::create_dir_all(&dir).ok()?;
+        let probe = dir.join(".write-test");
+        std::fs::write(&probe, b"").ok()?;
+        let _ = std::fs::remove_file(&probe);
+        Some(dir)
+    })
+    .as_deref()
+}
+
 fn settings_file(app: &AppHandle) -> Option<PathBuf> {
-    Some(app.path().app_config_dir().ok()?.join("settings.json"))
+    let dir = match portable_dir() {
+        Some(dir) => dir.to_path_buf(),
+        None => app.path().app_config_dir().ok()?,
+    };
+    Some(dir.join("settings.json"))
 }
 
 pub fn last_dat(app: &AppHandle) -> Option<String> {
@@ -30,7 +52,10 @@ pub fn voice_cache(app: &AppHandle, dat: &Path) -> Option<PathBuf> {
 
 /// One cache file per archive path (FNV-1a hash, stable across builds).
 pub fn index_cache(app: &AppHandle, dat: &Path) -> Option<PathBuf> {
-    let dir = app.path().app_cache_dir().ok()?;
+    let dir = match portable_dir() {
+        Some(dir) => dir.join("cache"),
+        None => app.path().app_cache_dir().ok()?,
+    };
     std::fs::create_dir_all(&dir).ok()?;
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     for byte in dat.to_string_lossy().bytes() {

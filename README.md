@@ -21,6 +21,30 @@ npx tauri build                     # release build plus installer packages
 The app reopens the last archive at startup. A `.dat` can also be dropped onto
 the window.
 
+### Portable Windows build
+
+The app needs no installer: the release executable contains the whole
+frontend, and the Visual C++ runtime is linked in statically
+(`.cargo/config.toml`). Build only the executable, on Windows:
+
+```bash
+npx tauri build --no-bundle
+```
+
+or cross-compiled from Linux (needs `cargo-xwin`, `lld` and `llvm`, and
+`rustup target add x86_64-pc-windows-msvc`):
+
+```bash
+npx tauri build --no-bundle --runner cargo-xwin --target x86_64-pc-windows-msvc
+```
+
+Zip `gw2browser.exe` (from `target/release/` or
+`target/x86_64-pc-windows-msvc/release/`); it runs on Windows 10 and 11, which
+ship the WebView2 runtime. Settings, index caches and the web view's data are
+kept in a `data` folder next to the executable, so deleting the unpacked folder
+removes everything. Only when that folder cannot be written does the app use
+the per-user folders (`%APPDATA%`/`%LOCALAPPDATA%`, `~/.config`/`~/.cache`).
+
 ## Features
 
 | Area | Preview | Export (converted) |

@@ -33,6 +33,18 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
+        .setup(|app| {
+            // The window is created here rather than from the config so the
+            // web view keeps its data (WebView2's EBWebView folder on Windows)
+            // in the portable data folder.
+            let config = app.config().app.windows.first().cloned().unwrap_or_default();
+            let mut window = tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?;
+            if let Some(dir) = settings::portable_dir() {
+                window = window.data_directory(dir.join("webview"));
+            }
+            window.build()?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::startup_path,
             commands::open_dat,
