@@ -68,14 +68,12 @@ file_types! {
     BankIndex => "ABIX", "abix", Binary, ["Soundbank Index"];
     AudioScript => "AMSP", "amsp", Binary, ["Audio Scripts"];
     Model => "MODL", "modl", Model, ["Models", "Other"];
-    ModelProp => "MODL prop", "modl", Model, ["Models", "Props"];
-    ModelMultiPart => "MODL multi", "modl", Model, ["Models", "Multi-part props"];
-    ModelAnimated => "MODL animated", "modl", Model, ["Models", "Animated"];
-    ModelEquipment => "MODL equip", "modl", Model, ["Models", "Equipment & body parts"];
-    ModelCreature => "MODL creature", "modl", Model, ["Models", "Creatures & NPCs"];
+    ModelAnimated => "MODL animated", "modl", Model, ["Models", "Models with animation"];
+    ModelStatic => "MODL static", "modl", Model, ["Models", "Models without animation"];
     ModelSkeleton => "MODL skeleton", "modl", Model, ["Models", "Skeletons"];
     ModelAnimationSet => "MODL animset", "modl", Model, ["Models", "Animation sets"];
-    ModelEmpty => "MODL empty", "modl", Model, ["Models", "Without geometry"];
+    ModelMaterials => "MODL materials", "modl", Model, ["Models", "Only materials"];
+    ModelEmpty => "MODL empty", "modl", Model, ["Models", "Empty"];
     ModelAnimation => "MODL anim", "modl", Animation, ["Models", "Animations"];
     BoneScale => "bone", "bone", Binary, ["Models", "Bone scales"];
     ModelCollisionManifest => "cmaC", "cmac", Binary, ["Model Collision Manifest"];
@@ -95,15 +93,15 @@ file_types! {
     EmoteAnimation => "emoc", "emoc", Binary, ["Emote Animations"];
     ShaderCache => "CDHS", "cdhs", Binary, ["Shader Cache"];
     Config => "locl", "locl", Binary, ["Configuration"];
-    BitmapFont => "AFNT", "afnt", BitmapFont, ["Bitmap Font"];
-    BitmapFontGlyphs => "AFNT glyphs", "glyphs", FontGlyphs, ["Bitmap Font", "Glyphs"];
+    BitmapFont => "AFNT", "afnt", BitmapFont, ["Fonts", "Bitmap"];
+    BitmapFontGlyphs => "AFNT glyphs", "glyphs", FontGlyphs, ["Fonts", "Bitmap", "Glyphs"];
 
     Binary => "binary", "bin", Binary, ["Binaries"];
     Dll => "DLL", "dll", Binary, ["Binaries"];
     Exe => "EXE", "exe", Binary, ["Binaries"];
 
     Strings => "strs", "strs", Strings, ["Strings"];
-    Font => "font", "ttf", Font, ["Font"];
+    Font => "font", "ttf", Font, ["Fonts", "TrueType"];
     Bink2Video => "Bink2", "bk2", Binary, ["Bink Videos"];
     Arap => "ARAP", "arap", Binary, ["Misc"];
     Utf8Text => "UTF-8", "txt", Text, ["Text"];

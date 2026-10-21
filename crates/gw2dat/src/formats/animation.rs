@@ -95,3 +95,116 @@ mod tests {
         assert!(!is_animation_only(&head, 120));
     }
 }
+
+/// Where the data of one animation in a bank lives.
+#[derive(Clone, Debug)]
+pub enum ClipSource {
+    /// Inside the bank file itself.
+    Inline,
+    /// In a separate animation clip file (full quality).
+    External(u32),
+    /// Only a reduced-quality copy inside the bank.
+    LodOnly,
+    Missing,
+}
+
+#[derive(Clone, Debug)]
+pub struct BankEntry {
+    pub index: usize,
+    /// Name decoded from the animation token, e.g. `ugmrun____f`.
+    pub name: String,
+    pub source: ClipSource,
+}
+
+/// Decodes a name token (letters in five bits each, numeric suffix on top).
+pub fn token_name(token: u64) -> String {
+    let mut name = String::new();
+    let mut value = token & 0x0fff_ffff_ffff_ffff;
+    while value != 0 {
+        name.push(match (value & 31) as u8 {
+            d @ 1..=26 => (b'a' + d - 1) as char,
+            _ => '_',
+        });
+        value >>= 5;
+    }
+    if token >> 60 != 0 {
+        name.push_str(&format!("{:02}", token >> 60));
+    }
+    name
+}
+
+/// A Granny data block and its pointer width.
+pub struct ClipData<'a> {
+    pub block: &'a [u8],
+    pub wide: bool,
+}
+
+struct RawEntry<'a> {
+    token: u64,
+    inline: &'a [u8],
+    lod: &'a [u8],
+    external: Option<u32>,
+}
+
+fn raw_entries(data: &[u8]) -> Result<(Vec<RawEntry<'_>>, bool)> {
+    let file = PackFile::parse(data)?;
+    let Some(chunk) = file.chunk(ANIM) else { return Ok((Vec::new(), file.wide_pointers())) };
+    let Some(mut bank) = chunk.cursor().ptr()? else { return Ok((Vec::new(), file.wide_pointers())) };
+    let mut entries = Vec::new();
+    for mut item in bank.ref_list()? {
+        // token, PackGrannyAnimationType { animation, pointers }, Ptr<lod>
+        let token = item.u64()?;
+        let inline = item.byte_array()?;
+        item.array()?;
+        let (mut lod, mut external) = (&[][..], None);
+        if let Some(mut l) = item.ptr()? {
+            lod = l.byte_array()?;
+            l.array()?;
+            external = l.file_ref()?;
+        }
+        entries.push(RawEntry { token, inline, lod, external });
+    }
+    Ok((entries, file.wide_pointers()))
+}
+
+/// Animations in the bank of a model, skeleton or animation set file.
+pub fn bank(data: &[u8]) -> Result<Vec<BankEntry>> {
+    let (entries, _) = raw_entries(data)?;
+    Ok(entries
+        .into_iter()
+        .enumerate()
+        .map(|(index, e)| BankEntry {
+            index,
+            name: token_name(e.token),
+            source: if !e.inline.is_empty() {
+                ClipSource::Inline
+            } else if let Some(id) = e.external {
+                ClipSource::External(id)
+            } else if !e.lod.is_empty() {
+                ClipSource::LodOnly
+            } else {
+                ClipSource::Missing
+            },
+        })
+        .collect())
+}
+
+/// Granny data of a bank entry stored in the bank file (full or reduced
+/// quality); external clips are read with [`clip_file_data`].
+pub fn bank_clip_data(data: &[u8], index: usize) -> Result<ClipData<'_>> {
+    let (entries, wide) = raw_entries(data)?;
+    let entry = entries.into_iter().nth(index).ok_or_else(|| Error::format("animation bank", "no such entry"))?;
+    let block = if !entry.inline.is_empty() { entry.inline } else { entry.lod };
+    if block.is_empty() {
+        return Err(Error::format("animation bank", "the entry has no animation data"));
+    }
+    Ok(ClipData { block, wide })
+}
+
+/// Granny data of an animation clip file (a model file with only `ANIM`).
+pub fn clip_file_data(data: &[u8]) -> Result<ClipData<'_>> {
+    let file = PackFile::parse(data)?;
+    let mut c = file.require_chunk(ANIM)?.cursor();
+    c.ptr()?;
+    Ok(ClipData { block: c.byte_array()?, wide: file.wide_pointers() })
+}

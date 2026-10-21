@@ -33,11 +33,18 @@ pub struct Mesh {
     pub material_name: String,
     /// Flexible vertex format bits (see `fvf`).
     pub vertex_format: u32,
-    /// Positions in a right-handed, Y-up coordinate system.
+    /// Positions in a right-handed, Y-up coordinate system ([`decode`]) or in
+    /// the file's own space ([`decode_original`]).
     pub positions: Vec<[f32; 3]>,
     pub normals: Vec<[f32; 3]>,
     /// First texture coordinate set, if present.
     pub uvs: Vec<[f32; 2]>,
+    /// Bones the vertices refer to, as name tokens (see `skeleton::bone_token`).
+    pub bone_bindings: Vec<u64>,
+    /// Per vertex: up to four indices into `bone_bindings`, if skinned.
+    pub joints: Vec<[u8; 4]>,
+    /// Per vertex: weights of `joints` (summing to 255), if skinned.
+    pub weights: Vec<[u8; 4]>,
     /// Triangle list.
     pub indices: Vec<u32>,
 }
@@ -120,7 +127,17 @@ fn to_gl(v: [f32; 3]) -> [f32; 3] {
     [v[0], -v[2], -v[1]]
 }
 
-fn decode_vertices(format: u32, count: usize, data: &[u8], mesh: &mut Mesh) -> Result<()> {
+/// Coordinate system of decoded positions and normals.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Space {
+    /// Y-up with flipped winding (exports, simple viewers).
+    Gl,
+    /// As stored; skeletons and animations use this space.
+    Original,
+}
+
+fn decode_vertices(format: u32, count: usize, data: &[u8], mesh: &mut Mesh, space: Space) -> Result<()> {
+    let convert = |v: [f32; 3]| if space == Space::Gl { to_gl(v) } else { v };
     let stride = vertex_size(format);
     if stride == 0 || data.len() < stride * count {
         return Err(Error::format("model", format!("vertex buffer too small (fvf {format:#x})")));
@@ -144,13 +161,15 @@ fn decode_vertices(format: u32, count: usize, data: &[u8], mesh: &mut Mesh) -> R
             pos += 12;
         }
         if format & fvf::WEIGHTS != 0 {
+            mesh.weights.push(vertex[pos..pos + 4].try_into().unwrap());
             pos += 4;
         }
         if format & fvf::GROUP != 0 {
+            mesh.joints.push(vertex[pos..pos + 4].try_into().unwrap());
             pos += 4;
         }
         if has_normal {
-            let n = to_gl(vec3_at(vertex, pos));
+            let n = convert(vec3_at(vertex, pos));
             let length = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
             mesh.normals.push(if length > 0.0 {
                 [n[0] / length, n[1] / length, n[2] / length]
@@ -186,7 +205,7 @@ fn decode_vertices(format: u32, count: usize, data: &[u8], mesh: &mut Mesh) -> R
             let half = |at: usize| f16_to_f32(u16::from_le_bytes([vertex[at], vertex[at + 1]]));
             position = [half(pos), half(pos + 2), half(pos + 4)];
         }
-        mesh.positions.push(to_gl(position));
+        mesh.positions.push(convert(position));
         if has_uv {
             mesh.uvs.push(uv.unwrap_or_default());
         }
@@ -194,7 +213,7 @@ fn decode_vertices(format: u32, count: usize, data: &[u8], mesh: &mut Mesh) -> R
     Ok(())
 }
 
-fn read_mesh(mut c: Cursor) -> Result<Option<Mesh>> {
+fn read_mesh(mut c: Cursor, space: Space) -> Result<Option<Mesh>> {
     let ptr = c.pointer_size();
     c.skip(8)?; // visibility bone
     c.skip(4 + ptr)?; // morph targets
@@ -205,7 +224,8 @@ fn read_mesh(mut c: Cursor) -> Result<Option<Mesh>> {
     c.skip(4 + ptr)?; // bounds
     let material_index = c.u32()?;
     let material_name = c.string()?;
-    c.skip(4 + ptr)?; // bone bindings
+    let (binding_count, mut bindings) = c.array()?;
+    let bone_bindings = (0..binding_count.min(1024)).map(|_| bindings.u64()).collect::<Result<Vec<_>>>()?;
     let Some(mut geometry) = c.ptr()? else { return Ok(None) };
 
     let vertex_count = geometry.u32()? as usize;
@@ -213,9 +233,9 @@ fn read_mesh(mut c: Cursor) -> Result<Option<Mesh>> {
     let vertices = geometry.byte_array()?;
     let (index_count, mut index_data) = geometry.array()?;
 
-    let mut mesh = Mesh { material_index, material_name, vertex_format: format, ..Mesh::default() };
+    let mut mesh = Mesh { material_index, material_name, vertex_format: format, bone_bindings, ..Mesh::default() };
     if vertex_count > 0 {
-        decode_vertices(format, vertex_count, vertices, &mut mesh)?;
+        decode_vertices(format, vertex_count, vertices, &mut mesh, space)?;
     }
     let raw = index_data.take(index_count * 2)?;
     mesh.indices.reserve(index_count);
@@ -225,14 +245,29 @@ fn read_mesh(mut c: Cursor) -> Result<Option<Mesh>> {
         if a as usize >= vertex_count || b as usize >= vertex_count || c as usize >= vertex_count {
             return Err(Error::format("model", "triangle index out of range"));
         }
-        // Flipped winding, see `to_gl`.
-        mesh.indices.extend_from_slice(&[a, c, b]);
+        if space == Space::Gl {
+            // Flipped winding, see `to_gl`.
+            mesh.indices.extend_from_slice(&[a, c, b]);
+        } else {
+            mesh.indices.extend_from_slice(&[a, b, c]);
+        }
     }
     Ok(Some(mesh))
 }
 
-/// Reads all meshes (highest level of detail) of a model file.
+/// Reads all meshes (highest level of detail) of a model file, converted to a
+/// right-handed Y-up coordinate system.
 pub fn decode(data: &[u8]) -> Result<Model> {
+    decode_in(data, Space::Gl)
+}
+
+/// Like [`decode`], but positions, normals and winding stay as stored, which
+/// is the space skeletons and animations are defined in.
+pub fn decode_original(data: &[u8]) -> Result<Model> {
+    decode_in(data, Space::Original)
+}
+
+fn decode_in(data: &[u8], space: Space) -> Result<Model> {
     let file = PackFile::parse(data)?;
     if file.file_type != MODL {
         return Err(Error::format("model", "not a MODL file"));
@@ -243,7 +278,7 @@ pub fn decode(data: &[u8]) -> Result<Model> {
     }
     let mut meshes = Vec::new();
     for item in chunk.cursor().ref_list()? {
-        if let Some(mesh) = read_mesh(item)? {
+        if let Some(mesh) = read_mesh(item, space)? {
             meshes.push(mesh);
         }
     }
@@ -506,14 +541,22 @@ pub struct ModelInfo {
     pub skeleton: Option<u32>,
     /// The model has an animation bank.
     pub animated: bool,
+    /// Animations in the bank apart from the rest pose (`zeropose`).
+    pub clips: usize,
     pub meshes: u32,
-    /// A material references a diffuse texture.
-    pub textured: bool,
+    pub materials: usize,
 }
 
 impl ModelInfo {
-    /// The model's type, before models bound to an external skeleton are
-    /// split by how many models share that skeleton (see `crate::index`).
+    /// The model can play its own animations: it has clips and a skeleton
+    /// to play them on.
+    pub fn has_own_clips(&self) -> bool {
+        self.clips > 0 && (self.bones > 0 || self.skeleton.is_some())
+    }
+
+    /// The model's type. Models with meshes but without own clips may still
+    /// get animations from their skeleton or animation sets; `crate::index`
+    /// upgrades those to [`crate::FileType::ModelAnimated`].
     pub fn file_type(&self) -> crate::FileType {
         use crate::FileType;
         if self.meshes == 0 {
@@ -521,21 +564,13 @@ impl ModelInfo {
                 FileType::ModelSkeleton
             } else if self.skeleton.is_some() && self.animated {
                 FileType::ModelAnimationSet
+            } else if self.materials > 0 {
+                FileType::ModelMaterials
             } else {
                 FileType::ModelEmpty
             };
         }
-        if self.skeleton.is_some() && self.bones == 0 {
-            // Creatures and NPCs come with textures; armor parts are textured
-            // (and dyed) by the game at runtime.
-            return if self.textured { FileType::ModelCreature } else { FileType::ModelEquipment };
-        }
-        match self.bones {
-            _ if self.animated => FileType::ModelAnimated,
-            0 => FileType::Model,
-            1 => FileType::ModelProp,
-            _ => FileType::ModelMultiPart,
-        }
+        if self.has_own_clips() { FileType::ModelAnimated } else { FileType::ModelStatic }
     }
 }
 
@@ -581,10 +616,9 @@ pub fn classify(prefix: &[u8], file_size: usize) -> Classified {
         return Classified::Info(ModelInfo { meshes, ..ModelInfo::default() });
     };
     match skeleton_and_animation(&file) {
-        Ok((bones, skeleton, animated)) => {
-            let textured = materials(prefix)
-                .is_ok_and(|materials| materials.iter().any(|m| m.texture(TextureSlot::Diffuse).is_some()));
-            Classified::Info(ModelInfo { bones, skeleton, animated, meshes, textured })
+        Ok((bones, skeleton, animated, clips)) => {
+            let materials = materials(prefix).map(|m| m.len()).unwrap_or(0);
+            Classified::Info(ModelInfo { bones, skeleton, animated, clips, meshes, materials })
         }
         // A pointer led past the prefix: read everything.
         Err(_) if prefix.len() < file_size => Classified::NeedBytes(file_size),
@@ -592,8 +626,9 @@ pub fn classify(prefix: &[u8], file_size: usize) -> Classified {
     }
 }
 
-/// Own bone count, external skeleton and whether there is an animation bank.
-fn skeleton_and_animation(file: &PackFile) -> Result<(usize, Option<u32>, bool)> {
+/// Own bone count, external skeleton, whether there is an animation bank, and
+/// the number of animations in it apart from the rest pose.
+fn skeleton_and_animation(file: &PackFile) -> Result<(usize, Option<u32>, bool, usize)> {
     let (mut bones, mut skeleton) = (0usize, None);
     if let Some(skel) = file.chunk(SKEL) {
         // skeleton data -> Granny model (name, skeleton -> (name, bones))
@@ -608,14 +643,18 @@ fn skeleton_and_animation(file: &PackFile) -> Result<(usize, Option<u32>, bool)>
             }
         }
     }
-    let animated = match file.chunk(ANIM) {
-        Some(anim) => match anim.cursor().ptr()? {
-            Some(mut bank) => bank.array()?.0 > 0,
-            None => false,
-        },
-        None => false,
-    };
-    Ok((bones, skeleton, animated))
+    let (mut animated, mut clips) = (false, 0);
+    if let Some(mut bank) = file.chunk(ANIM).map(|a| a.cursor().ptr()).transpose()?.flatten() {
+        let rest_pose = crate::formats::skeleton::bone_token("zeropose");
+        let entries = bank.ref_list()?;
+        animated = !entries.is_empty();
+        for mut entry in entries {
+            if entry.u64()? != rest_pose {
+                clips += 1;
+            }
+        }
+    }
+    Ok((bones, skeleton, animated, clips))
 }
 
 /// Structural facts about a model file, for display.
@@ -646,24 +685,24 @@ mod classification_tests {
     use super::*;
     use crate::FileType;
 
-    fn info(bones: usize, skeleton: Option<u32>, animated: bool, meshes: u32, textured: bool) -> FileType {
-        ModelInfo { bones, skeleton, animated, meshes, textured }.file_type()
+    fn info(bones: usize, skeleton: Option<u32>, clips: usize, meshes: u32, materials: usize) -> FileType {
+        ModelInfo { bones, skeleton, animated: clips > 0, clips, meshes, materials }.file_type()
     }
 
     #[test]
     fn meshless_models() {
-        assert_eq!(info(60, None, true, 0, false), FileType::ModelSkeleton);
-        assert_eq!(info(0, Some(5), true, 0, false), FileType::ModelAnimationSet);
-        assert_eq!(info(0, Some(5), false, 0, false), FileType::ModelEmpty);
-        assert_eq!(info(1, None, false, 0, false), FileType::ModelEmpty);
+        assert_eq!(info(60, None, 3, 0, 0), FileType::ModelSkeleton);
+        assert_eq!(info(0, Some(5), 4, 0, 0), FileType::ModelAnimationSet);
+        assert_eq!(info(0, Some(5), 0, 0, 2), FileType::ModelMaterials);
+        assert_eq!(info(1, None, 0, 0, 0), FileType::ModelEmpty);
     }
 
     #[test]
     fn models_with_meshes() {
-        assert_eq!(info(0, Some(5), false, 2, true), FileType::ModelCreature);
-        assert_eq!(info(0, Some(5), true, 2, false), FileType::ModelEquipment);
-        assert_eq!(info(30, None, true, 1, true), FileType::ModelAnimated);
-        assert_eq!(info(30, None, false, 1, true), FileType::ModelMultiPart);
-        assert_eq!(info(1, None, false, 1, false), FileType::ModelProp);
+        assert_eq!(info(30, None, 2, 1, 1), FileType::ModelAnimated);
+        assert_eq!(info(0, Some(5), 1, 1, 1), FileType::ModelAnimated);
+        assert_eq!(info(30, None, 0, 1, 1), FileType::ModelStatic);
+        // Clips without anything to play them on.
+        assert_eq!(info(0, None, 2, 1, 1), FileType::ModelStatic);
     }
 }

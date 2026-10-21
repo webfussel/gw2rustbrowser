@@ -94,11 +94,53 @@ export interface EulaText {
 }
 
 export interface ModelMesh {
+  /** In the file's coordinate space (see ModelViewer). */
   positions: Float32Array<ArrayBuffer>;
   normals: Float32Array<ArrayBuffer> | null;
   uvs: Float32Array<ArrayBuffer> | null;
+  /** Four skeleton bone indices per vertex. */
+  skinIndices: Uint16Array<ArrayBuffer> | null;
+  /** Four weights per vertex, 0–255. */
+  skinWeights: Uint8Array<ArrayBuffer> | null;
   indices: Uint32Array<ArrayBuffer>;
   materialIndex: number;
+}
+
+export interface RigBone {
+  name: string;
+  parent: number | null;
+  translation: [number, number, number];
+  rotation: [number, number, number, number];
+  scale: [number, number, number];
+}
+
+export interface AnimationRef {
+  source: number;
+  index: number;
+  name: string;
+  group: string;
+}
+
+export interface Rig {
+  bones: RigBone[];
+  skeletonFile: number | null;
+  animations: AnimationRef[];
+}
+
+export interface ClipTrack {
+  bone: string;
+  rotationTimes: number[];
+  rotations: number[];
+  translationTimes: number[];
+  translations: number[];
+  scaleTimes: number[];
+  scales: number[];
+}
+
+export interface Clip {
+  name: string;
+  duration: number;
+  tracks: ClipTrack[];
 }
 
 export interface FontRange {
@@ -149,7 +191,6 @@ export interface ModelSummary {
   meshes: number;
   animations: number;
   materials: number;
-  textured: boolean;
   skeleton: number | null;
   users: number;
 }
@@ -194,9 +235,25 @@ function parseModel(buffer: ArrayBuffer): ModelMesh[] {
     const positions = floats(vertices * 3);
     const normals = flags & 1 ? floats(vertices * 3) : null;
     const uvs = flags & 2 ? floats(vertices * 2) : null;
+    let skinIndices: Uint16Array<ArrayBuffer> | null = null;
+    let skinWeights: Uint8Array<ArrayBuffer> | null = null;
+    if (flags & 4) {
+      // Interleaved per vertex: four u16 bone indices, then four u8 weights.
+      skinIndices = new Uint16Array(vertices * 4);
+      skinWeights = new Uint8Array(vertices * 4);
+      const bytes = new Uint8Array(buffer);
+      for (let v = 0; v < vertices; v++) {
+        const at = offset + v * 12;
+        for (let j = 0; j < 4; j++) {
+          skinIndices[v * 4 + j] = view.getUint16(at + j * 2, true);
+          skinWeights[v * 4 + j] = bytes[at + 8 + j];
+        }
+      }
+      offset += vertices * 12;
+    }
     const indices = new Uint32Array(buffer, offset, indexCount);
     offset += indexCount * 4;
-    meshes.push({ positions, normals, uvs, indices, materialIndex });
+    meshes.push({ positions, normals, uvs, skinIndices, skinWeights, indices, materialIndex });
   }
   return meshes;
 }
@@ -245,6 +302,8 @@ export const api = {
     const [, pages, glyphs] = image.format.split("|").map(Number);
     return { image: { ...image, format: `${glyphs} glyphs` }, pages };
   },
+  modelRig: (mft: number) => invoke<Rig>("model_rig", { mft }),
+  modelClip: (source: number, index: number) => invoke<Clip>("model_clip", { source, index }),
   modelSummary: (mft: number) => invoke<ModelSummary>("model_summary", { mft }),
   loadFonts: (mft: number) => invoke<FontInfo[]>("load_fonts", { mft }),
   fontAtlas: async (mft: number, font: number, range: number, page: number) => {

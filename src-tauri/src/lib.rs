@@ -2,6 +2,7 @@ mod commands;
 mod export;
 mod font_export;
 mod model_export;
+mod rig;
 mod session;
 mod settings;
 
@@ -42,6 +43,8 @@ pub fn run() {
             commands::load_text,
             commands::load_animation,
             commands::model_summary,
+            commands::model_rig,
+            commands::model_clip,
             commands::font_atlas,
             commands::truetype_info,
             commands::glyph_file_info,

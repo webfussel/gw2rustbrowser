@@ -17,7 +17,7 @@
   import GlyphFileViewer from "./viewers/GlyphFileViewer.svelte";
 
   /** Model types without meshes get a summary instead of the 3D view. */
-  const meshlessModels = ["MODL skeleton", "MODL animset", "MODL empty"];
+  const meshlessModels = ["MODL skeleton", "MODL animset", "MODL materials", "MODL empty"];
   // three.js is large; load the 3D viewer only when a model is shown.
   const modelViewer = () => import("./viewers/ModelViewer.svelte");
 

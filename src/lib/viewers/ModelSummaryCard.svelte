@@ -23,7 +23,8 @@
     "MODL skeleton":
       "A skeleton without meshes. Armor, body parts and creature models are bound to skeletons like this one, which usually also carry their animations.",
     "MODL animset": "Animations for another model's skeleton, without meshes of its own.",
-    "MODL empty": "This model file contains no meshes and no animations.",
+    "MODL materials": "Materials only: this model file has no meshes, skeleton or animations.",
+    "MODL empty": "This model file contains no meshes, materials or animations, only a reference to a skeleton.",
   };
 </script>
 

@@ -29,7 +29,7 @@ the window.
 | DDS (DXT, RGB16/24/32, L8, V8U8, R32F), JPEG, PNG, WebP | as above | PNG |
 | Sounds (PF ASND MP3/Ogg, asnd, MP3, Ogg) | Player | MP3/Ogg |
 | Sound banks (ABNK) | List of all entries, play and export individually | one file per playable entry |
-| Models (MODL, all chunk versions) | 3D view with textures, wireframe | OBJ + MTL + PNG textures |
+| Models (MODL, all chunk versions) | 3D view with textures, wireframe, skeleton; **animation playback** (own clips, the skeleton's clips and every animation set made for the skeleton) with timeline and speed | OBJ + MTL + PNG textures |
 | Animation clips (MODL with only an ANIM chunk, 15,218 files) | Name, duration, frames/fps, track groups | raw |
 | Strings (strs) | Table with filter | TSV |
 | EULA | Text per language | TXT |
@@ -45,26 +45,19 @@ results are exported in parallel with a progress bar.
 Tree and file list show an icon for each of the 67 file types; a category
 takes the icon of its content (of its most common kind if it mixes types).
 
-Models are sorted by what they are, judged from their skeleton, animation,
-material and mesh data (only the file up to those chunk headers is read while
-scanning, not the geometry):
+Models are sorted by what they contain (only the file up to the skeleton,
+animation, material and mesh chunk headers is read while scanning):
 
-| Folder | Files | Detection |
+| Folder | Files | Contents |
 |---|---|---|
-| Props | 92,354 | single bone: rocks, terrain pieces, buildings |
-| Equipment & body parts | 40,092 | bound to a player skeleton (one shared by ≥ 1,000 models), or untextured on another skeleton: armor, hair, faces |
-| Multi-part props | 24,473 | own multi-bone skeleton, no animations |
-| Animated | 18,609 | own skeleton with an animation bank: cloth, banners, moving objects |
-| Creatures & NPCs | 1,587 | textured and bound to a non-player skeleton: animals, monsters, NPCs |
-| Animations | 15,218 | a single ANIM chunk (Granny animation clip) |
-| Skeletons | 5,951 | no meshes, own skeleton; the other models are bound to these |
-| Animation sets | 1,514 | no meshes, animations for another file's skeleton |
-| Without geometry | 374 | neither meshes nor animations |
+| Models with animation | 57,552 | meshes, and animations to play: its own clips, its skeleton file's clips or animation sets made for its skeleton (the same sources the 3D viewer lists) |
+| Models without animation | 119,563 | meshes, nothing to animate them with |
+| Skeletons | 5,951 | no meshes, own skeleton; other models are bound to these |
 | Bone scales | 64 | `bone` files: body proportions for character creation |
-
-The eight player skeletons are recognised by counting how many models share
-each skeleton, so no id list has to be maintained.
-
+| Animations | 15,218 | a single ANIM chunk (Granny animation clip) |
+| Animation sets | 1,514 | no meshes, animations for another file's skeleton |
+| Only materials | 344 | materials, no meshes, skeleton or animations |
+| Empty | 30 | neither meshes, materials nor animations, only a skeleton reference |
 Search: file ID (base or file ID, also by prefix) or `#<MFT index>`.
 Shortcuts: `Ctrl+O` open, `Ctrl+F` search, arrow keys/PageUp/PageDown in the
 file list.
@@ -105,6 +98,9 @@ file list.
 - Model files without geometry (the original reports "no data"/crashes) are
   recognised as what they are: Granny animation clips. They have their own
   category "Models / Animations" with name, duration and frame rate.
+- Animations: Granny 3D clips are decoded (all 13 curve formats in use,
+  including compressed quaternions) and played on the model's skeleton with
+  skinning. Mesh bones are matched to skeleton bones by their name tokens.
 - Bitmap fonts: all 13 character ranges instead of Basic Latin only; glyph files
   are recognised through the font's references instead of a hard-coded ID list.
 - Sound banks: Ogg entries as well as MP3.

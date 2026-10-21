@@ -4,9 +4,11 @@ pub mod animation;
 pub mod audio;
 pub mod content;
 pub mod font;
+pub mod granny;
 pub mod image;
 pub mod model;
 pub mod pf;
+pub mod skeleton;
 pub mod text;
 pub mod truetype;
 

@@ -423,19 +423,13 @@ pub async fn load_eula(app: AppHandle, mft: u32) -> CmdResult<Vec<EulaDto>> {
     .await
 }
 
-/// Model geometry in the compact binary form of `model::to_binary`.
+/// Model geometry and skinning in the binary form of `rig::model_binary`.
 #[tauri::command]
 pub async fn load_model(app: AppHandle, mft: u32) -> CmdResult<Response> {
     blocking(move || {
         let session = session(&app.state::<AppState>())?;
         let data = session.read(mft).map_err(err)?;
-        let model = formats::model::decode(&data).map_err(|e| match e {
-            gw2dat::Error::Format { reason, .. } if reason.contains("no GEOM chunk") => {
-                "This model file contains no geometry (animation, skeleton or collision data only).".to_string()
-            }
-            other => other.to_string(),
-        })?;
-        Ok(Response::new(formats::model::to_binary(&model)))
+        Ok(Response::new(crate::rig::model_binary(&session, &data)?))
     })
     .await
 }
@@ -477,6 +471,24 @@ pub async fn load_animation(app: AppHandle, mft: u32) -> CmdResult<AnimationDto>
     .await
 }
 
+#[tauri::command]
+pub async fn model_rig(app: AppHandle, mft: u32) -> CmdResult<crate::rig::RigDto> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        crate::rig::rig(&session, mft)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn model_clip(app: AppHandle, source: u32, index: usize) -> CmdResult<crate::rig::ClipDto> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        crate::rig::clip(&session, source, index)
+    })
+    .await
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelSummaryDto {
@@ -484,7 +496,6 @@ pub struct ModelSummaryDto {
     meshes: u32,
     animations: usize,
     materials: usize,
-    textured: bool,
     /// External skeleton this model is bound to.
     skeleton: Option<u32>,
     /// Models bound to this file as their skeleton.
@@ -508,7 +519,6 @@ pub async fn model_summary(app: AppHandle, mft: u32) -> CmdResult<ModelSummaryDt
             meshes: summary.info.meshes,
             animations: summary.animations,
             materials: summary.materials,
-            textured: summary.info.textured,
             skeleton: summary.info.skeleton,
             users,
         })
