@@ -22,6 +22,11 @@ export function displayName(file: { baseId: number; mft: number }): string {
   return file.baseId ? String(file.baseId) : `ID-less #${file.mft}`;
 }
 
+/** File name of an asset path (`\` or `/` separated). */
+export function assetName(path: string): string {
+  return path.slice(Math.max(path.lastIndexOf("\\"), path.lastIndexOf("/")) + 1);
+}
+
 export function errorMessage(error: unknown): string {
   return typeof error === "string" ? error : error instanceof Error ? error.message : JSON.stringify(error);
 }

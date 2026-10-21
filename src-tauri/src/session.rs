@@ -1,7 +1,7 @@
 //! An opened archive together with its index and lookup tables.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use gw2dat::{Archive, FileType, Index, IndexEntry, Kind};
 
@@ -22,6 +22,8 @@ pub struct Session {
     pub skeleton_users: HashMap<u32, u32>,
     /// Game texts and voice lines, loaded on first use.
     pub texts: crate::texts::TextState,
+    /// Original asset paths by base id, from the model collision manifest.
+    asset_paths: OnceLock<HashMap<u32, String>>,
     /// The most recently read file; previews read the same file repeatedly.
     recent: Mutex<Option<(u32, Arc<Vec<u8>>)>>,
 }
@@ -88,8 +90,42 @@ impl Session {
             by_mft,
             skeleton_users,
             texts: Default::default(),
+            asset_paths: OnceLock::new(),
             recent: Mutex::new(None),
         }
+    }
+
+    /// Original asset paths of models and their collision files, keyed by
+    /// base id. The model collision manifest (cmaC) is read on first use.
+    pub fn asset_paths(&self) -> &HashMap<u32, String> {
+        self.asset_paths.get_or_init(|| {
+            let Some(manifest) = self.index.entries.iter().find(|e| e.file_type == FileType::ModelCollisionManifest)
+            else {
+                return HashMap::new();
+            };
+            let Ok(entries) = self
+                .archive
+                .read(manifest.mft_index)
+                .map_err(|e| e.to_string())
+                .and_then(|data| gw2dat::formats::manifests::collision_manifest(&data).map_err(|e| e.to_string()))
+            else {
+                return HashMap::new();
+            };
+            let mut paths = HashMap::with_capacity(entries.len() * 2);
+            for entry in entries {
+                for id in [entry.model, entry.collision].into_iter().flatten() {
+                    if let Some(e) = self.archive.entry_for_id(id).and_then(|mft| self.entry(mft)) {
+                        paths.entry(e.base_id).or_insert_with(|| entry.name.clone());
+                    }
+                }
+            }
+            paths
+        })
+    }
+
+    /// Asset path of a file, if the collision manifest names it.
+    pub fn asset_path(&self, base_id: u32) -> Option<&str> {
+        self.asset_paths().get(&base_id).map(String::as_str)
     }
 
     pub fn entry(&self, mft_index: u32) -> Option<&IndexEntry> {

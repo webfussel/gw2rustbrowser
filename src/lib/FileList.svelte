@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { FileInfo, FindResult } from "./api";
-  import { displayName, formatBytes } from "./format";
+  import { assetName, displayName, formatBytes } from "./format";
   import { browser, clearSearch, exportMany, revealCategory } from "./state.svelte";
   import FileIcon from "./FileIcon.svelte";
 
@@ -151,7 +151,13 @@
       >
         <span class="name">
           <FileIcon type={file.type} size={14} />
-          <span class="mono" title={file.knownName}>{displayName(file)}{#if file.knownName}<span class="known"> · {file.knownName}</span>{/if}</span>
+          <span class="mono" title={file.assetPath ?? file.knownName}
+            >{displayName(file)}{#if file.knownName}<span class="known"> · {file.knownName}</span>{/if}{#if file.assetPath}<span
+                class="known"
+              >
+                · {assetName(file.assetPath)}</span
+              >{/if}</span
+          >
         </span>
         {#if !searching}<span class="mono muted">{file.fileId || ""}</span>{/if}
         <span class="type">{file.type}</span>

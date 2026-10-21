@@ -29,6 +29,8 @@ export interface FileInfo {
   type: string;
   size: number;
   knownName?: string;
+  /** Original asset path from development (models and their collision files). */
+  assetPath?: string;
 }
 
 export interface EntryDetail extends FileInfo {
@@ -48,6 +50,10 @@ export type Kind =
   | "soundbank"
   | "soundbankindex"
   | "audioscript"
+  | "pagedimage"
+  | "emotes"
+  | "collisionmanifest"
+  | "portalmanifest"
   | "model"
   | "animation"
   | "strings"
@@ -368,6 +374,77 @@ function parseMap(buffer: ArrayBuffer): MapData {
   };
 }
 
+export interface FileRef {
+  id: number;
+  /** MFT index, -1 if the file is not in the archive. */
+  mft: number;
+  kind: string | null;
+}
+
+export interface CollisionEntry {
+  name: string;
+  model: FileRef | null;
+  collision: FileRef | null;
+  scales: number[];
+}
+
+export interface PortalStart {
+  token: number;
+  position: [number, number, number];
+  radius: number;
+  models: number;
+  /** Models per file type name. */
+  kinds: Record<string, number>;
+}
+
+export interface PortalMap {
+  guid: string;
+  redirectors: { guid: string; token: number; position: [number, number, number]; radius: number }[];
+  starts: PortalStart[];
+}
+
+export interface PortalModel {
+  file: FileRef | null;
+  flags: number;
+  kind: number;
+  permutation: string;
+}
+
+export interface EmoteTiming {
+  fileId: number | null;
+  /** MFT index of the model file, -1 if missing. */
+  mft: number;
+  fileType: string | null;
+  /** Seconds. */
+  blendIn: number;
+  blendOut: number;
+  /** Milliseconds. */
+  intro: number;
+  loopLength: number;
+  outro: number;
+  startOffset: number;
+}
+
+export interface Emote {
+  name: string;
+  timings: EmoteTiming[];
+}
+
+export interface PagedImageLayer {
+  index: number;
+  pageWidth: number;
+  pageHeight: number;
+  format: string;
+  /** [min x, min y, max x, max y] of the pages. */
+  bounds: [number, number, number, number] | null;
+  xs: number[];
+  ys: number[];
+  /** Texture file id per page, 0 for a solid page. */
+  files: number[];
+  /** Solid page colour, 0xRRGGBBAA. */
+  colors: number[];
+}
+
 export interface ScriptFile {
   id: number;
   /** MFT index, -1 if the file is not in the archive. */
@@ -630,6 +707,18 @@ export const api = {
   },
   modelMaterials: (mft: number) => invoke<ModelMaterial[]>("model_materials", { mft }),
   loadSound: async (mft: number) => parseSound(await invoke<ArrayBuffer>("load_sound", { mft })),
+  collisionManifest: (mft: number) => invoke<CollisionEntry[]>("collision_manifest_info", { mft }),
+  portalManifest: (mft: number) => invoke<PortalMap[]>("portal_manifest_info", { mft }),
+  portalStartModels: (mft: number, map: number, start: number) =>
+    invoke<PortalModel[]>("portal_start_models", { mft, map, start }),
+  emoteInfo: (mft: number) => invoke<Emote[]>("emote_info", { mft }),
+  pagedImageInfo: (mft: number) => invoke<PagedImageLayer[]>("paged_image_info", { mft }),
+  pagedImageOverview: async (mft: number, layer: number, maxSize: number) =>
+    parseImage(await invoke<ArrayBuffer>("paged_image_overview", { mft, layer, maxSize })),
+  pagedImageTile: async (fileId: number, size: number) =>
+    parseImage(await invoke<ArrayBuffer>("paged_image_tile", { fileId, size })),
+  exportPagedImage: (mft: number, layer: number, pagePixels: number, path: string) =>
+    invoke<void>("export_paged_image", { mft, layer, pagePixels, path }),
   audioScriptInfo: (mft: number) => invoke<AudioScriptInfo>("audio_script_info", { mft }),
   loadBankIndex: (mft: number) => invoke<BankIndexLanguage[]>("load_bank_index", { mft }),
   loadBank: (mft: number) => invoke<BankEntry[]>("load_bank", { mft }),

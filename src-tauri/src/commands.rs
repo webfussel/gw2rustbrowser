@@ -156,10 +156,13 @@ pub struct FileDto {
     size: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     known_name: Option<&'static str>,
+    /// Original asset path from development (models and their collision).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    asset_path: Option<String>,
 }
 
-impl From<&IndexEntry> for FileDto {
-    fn from(e: &IndexEntry) -> Self {
+impl FileDto {
+    pub fn new(session: &Session, e: &IndexEntry) -> Self {
         FileDto {
             mft: e.mft_index,
             base_id: e.base_id,
@@ -167,6 +170,7 @@ impl From<&IndexEntry> for FileDto {
             file_type: e.file_type.name(),
             size: e.size,
             known_name: e.known_name(),
+            asset_path: session.asset_path(e.base_id).map(str::to_owned),
         }
     }
 }
@@ -175,7 +179,7 @@ impl From<&IndexEntry> for FileDto {
 pub fn category_files(state: State<'_, AppState>, category: u32) -> CmdResult<Vec<FileDto>> {
     let session = session(&state)?;
     let list = session.files.get(category as usize).ok_or("Unknown category")?;
-    Ok(list.iter().map(|&i| FileDto::from(&session.index.entries[i as usize])).collect())
+    Ok(list.iter().map(|&i| FileDto::new(&session, &session.index.entries[i as usize])).collect())
 }
 
 #[derive(Serialize)]
@@ -199,7 +203,7 @@ pub fn entry_info(state: State<'_, AppState>, mft: u32) -> CmdResult<EntryDetail
     let entry = session.entry(mft).ok_or("Unknown file")?;
     let stored = session.archive.entry(mft).map_err(err)?;
     Ok(EntryDetail {
-        file: FileDto::from(entry),
+        file: FileDto::new(&session, entry),
         kind: format!("{:?}", entry.file_type.kind()).to_lowercase(),
         category: entry.category,
         path: session.index.category_path(entry.category),
@@ -221,14 +225,15 @@ pub struct FindResult {
 }
 
 /// Finds files by id: exact base/file id matches first, then base ids that
-/// start with the query. `#123` looks up an MFT index.
+/// start with the query. `#123` looks up an MFT index; other text matches
+/// asset paths and known file names.
 #[tauri::command]
 pub fn find(state: State<'_, AppState>, query: String) -> CmdResult<Vec<FindResult>> {
     const LIMIT: usize = 200;
     let session = session(&state)?;
     let query = query.trim();
     let result = |e: &IndexEntry| FindResult {
-        file: FileDto::from(e),
+        file: FileDto::new(&session, e),
         category: e.category,
         path: session.index.category_path(e.category),
     };
@@ -238,7 +243,18 @@ pub fn find(state: State<'_, AppState>, query: String) -> CmdResult<Vec<FindResu
         return Ok(session.entry(mft).map(result).into_iter().collect());
     }
     let Ok(id) = query.parse::<u32>() else {
-        return Ok(Vec::new());
+        let needle = query.to_lowercase();
+        let mut named: Vec<(&str, &IndexEntry)> = session
+            .index
+            .entries
+            .iter()
+            .filter_map(|e| {
+                let name = session.asset_path(e.base_id).or_else(|| e.known_name())?;
+                name.to_lowercase().contains(&needle).then_some((name, e))
+            })
+            .collect();
+        named.sort_by(|a, b| a.0.cmp(b.0).then(a.1.file_type.name().cmp(b.1.file_type.name())));
+        return Ok(named.into_iter().take(LIMIT).map(|(_, e)| result(e)).collect());
     };
 
     let mut found: Vec<FindResult> = Vec::new();
@@ -270,7 +286,7 @@ pub async fn read_file(app: AppHandle, mft: u32) -> CmdResult<Response> {
 }
 
 /// Image as `[width u32][height u32][format length u16][format][RGBA…]`.
-fn image_response(image: formats::image::RgbaImage) -> Response {
+pub fn image_response(image: formats::image::RgbaImage) -> Response {
     let mut out = Vec::with_capacity(10 + image.format.len() + image.pixels.len());
     out.extend_from_slice(&image.width.to_le_bytes());
     out.extend_from_slice(&image.height.to_le_bytes());
@@ -934,6 +950,12 @@ pub fn suggest_file_name(state: State<'_, AppState>, mft: u32, converted: bool) 
         return Ok(name.to_string());
     }
     let extension = if converted { formats::converted_extension(entry.file_type) } else { entry.file_type.extension() };
+    // Asset names are those of the source files, so keep the id and the real extension.
+    if let Some(path) = session.asset_path(entry.base_id) {
+        let file = path.rsplit(['\\', '/']).next().unwrap_or(path);
+        let stem = file.rsplit_once('.').map_or(file, |(stem, _)| stem);
+        return Ok(format!("{stem}_{}.{extension}", entry.name()));
+    }
     Ok(format!("{}.{extension}", entry.name()))
 }
 

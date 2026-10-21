@@ -45,7 +45,7 @@
       <input
         bind:this={input}
         type="search"
-        placeholder="Find by file id, or #MFT index  (Ctrl+F)"
+        placeholder="Find by file id, asset name, or #MFT index  (Ctrl+F)"
         bind:value={query}
         onkeydown={onKey}
         oninput={() => !query && clearSearch()}

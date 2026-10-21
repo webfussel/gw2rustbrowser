@@ -1,14 +1,19 @@
 <script lang="ts">
   import { api, type EntryDetail } from "./api";
-  import { displayName, errorMessage, formatBytes } from "./format";
+  import { assetName, displayName, errorMessage, formatBytes } from "./format";
   import { browser, clearSearch, exportMany, exportOne, revealCategory } from "./state.svelte";
   import ImageViewer from "./viewers/ImageViewer.svelte";
   import HexViewer from "./viewers/HexViewer.svelte";
   import TextViewer from "./viewers/TextViewer.svelte";
+  import { languageFor } from "./highlight";
   import SoundPlayer from "./viewers/SoundPlayer.svelte";
   import SoundBankViewer from "./viewers/SoundBankViewer.svelte";
   import BankIndexViewer from "./viewers/BankIndexViewer.svelte";
   import AudioScriptViewer from "./viewers/AudioScriptViewer.svelte";
+  import PagedImageViewer from "./viewers/PagedImageViewer.svelte";
+  import EmoteViewer from "./viewers/EmoteViewer.svelte";
+  import CollisionManifestViewer from "./viewers/CollisionManifestViewer.svelte";
+  import PortalManifestViewer from "./viewers/PortalManifestViewer.svelte";
   import StringsViewer from "./viewers/StringsViewer.svelte";
   import EulaViewer from "./viewers/EulaViewer.svelte";
   import FontViewer from "./viewers/FontViewer.svelte";
@@ -42,6 +47,10 @@
     "soundbank",
     "soundbankindex",
     "audioscript",
+    "pagedimage",
+    "emotes",
+    "collisionmanifest",
+    "portalmanifest",
     "strings",
     "eula",
     "model",
@@ -93,6 +102,7 @@
       <FileIcon type={d.type} size={20} />
       <h1 class="mono">{displayName(d)}</h1>
       {#if d.knownName}<span class="known">{d.knownName}</span>{/if}
+      {#if d.assetPath}<span class="known" title={d.assetPath}>{assetName(d.assetPath)}</span>{/if}
       <span class="badge">{d.type}</span>
       <div class="actions">
         {#if d.kind === "soundbank"}
@@ -134,9 +144,17 @@
       {#if activeTab === "preview" && d.kind === "image"}
         <ImageViewer load={() => api.loadImage(d.mft)} />
       {:else if activeTab === "preview" && (d.kind === "text" || d.kind === "content")}
-        <TextViewer mft={d.mft} />
+        <TextViewer mft={d.mft} language={d.kind === "content" ? "xml" : languageFor(d.path)} />
       {:else if activeTab === "preview" && d.kind === "sound"}
         <SoundPlayer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "collisionmanifest"}
+        <CollisionManifestViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "portalmanifest"}
+        <PortalManifestViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "emotes"}
+        <EmoteViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "pagedimage"}
+        <PagedImageViewer mft={d.mft} name={displayName(d)} />
       {:else if activeTab === "preview" && d.kind === "audioscript"}
         <AudioScriptViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "soundbankindex"}

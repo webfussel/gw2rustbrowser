@@ -35,16 +35,21 @@ the window.
 | Animation clips (MODL with only an ANIM chunk, 15,218 files) | Name, duration, frames/fps, track groups | raw |
 | Strings (strs) | Table with filter | TSV |
 | EULA | Text per language | TXT |
-| Game content (cntc) | XML | XML |
+| Game content (cntc) | XML with syntax highlighting | XML |
 | Bitmap fonts (AFNT) | Glyph atlas per font and character range | PNG per font and range |
 | Glyph files of bitmap fonts | Glyph atlas with character range and the fonts using it | PNG |
 | TrueType fonts (10 files) | Specimen in the font itself: sample text in several sizes, every mapped character | TTF |
 | Star fields (STAR, 2 files) | Sky chart (dome or panorama), stars sized by brightness, colouring by the unknown values, values on hover | CSV |
 | Animation sequences (anic) | Searchable table of 1,853 sequences / 8,858 variants: steps, movement, blend times, timeline with triggers, charge stages | JSON |
+| Emote animations (emoc, 1 file, 314 emotes) | Searchable emote list; per emote its variants (one per body type, mount or prop) with the animation file (jump to it), intro/loop/outro timeline, blend times, start offset; the selected variant's model in 3D or its summary | CSV |
+| Model collision manifest (cmaC, 1 file) | Searchable list of 9,188 models with collision: original asset path from development, model and collision file (jump to them) | CSV |
+| Portal manifests (prlt, 89 files) | Maps by GUID with their start points (position, radius, models by type) and exits; the models loaded for a start point, filterable by type, with links | CSV |
 | Maps (mapc, 287 files) | 3D view: terrain heightmap coloured by height and slope, sea level and lakes, props as textured models (loaded within a draw distance around the focus point with markers for the rest, or all at once); click a prop for its model id; size, prop and chunk overview | 16-bit heightmap PNG |
 | Materials (AMAT, 2,854 files) | Texture slots, techniques with their passes and effects (render state decoded: blending, depth, culling), sampler states; per shader: uniforms with registers, input/output signatures, vertex attributes, texture bindings and a shader model 5 disassembly annotated with uniform names | TXT (everything incl. disassembly) |
+| World map tiles (PIMG, 3,298 files, under Maps) | Pan and zoom like a map: an overview of the whole layer, sharper pages load as you zoom in (up to the full 512×512 per page); layers, page and texture under the cursor | PNG of a layer at a chosen pixels-per-page |
 | TextPack (txtm manifest, txtV variants, txtv voices) | Every game text by ID and language, full-text search, jump to ID; text variants side by side; voice lines with playback from the sound banks (only playable by default) | raw |
-| Text, everything else | Text or hex view | raw |
+| Text files (2,688, sorted by content: HTML, JavaScript, CSS, JSON, XML, PHP, ActionScript, licenses, documentation, plain text; mostly the YUI 3 web library the game ships for its web UI) | Text view with syntax highlighting (HTML/XML with embedded JS and CSS, JavaScript, CSS, JSON, PHP, Markdown, ActionScript; files up to 1 MiB) | raw |
+| Everything else | Hex view | raw |
 
 Every file can also be exported raw (decompressed). Whole categories or search
 results are exported in parallel with a progress bar.
@@ -52,20 +57,28 @@ results are exported in parallel with a progress bar.
 Tree and file list show an icon for each of the 67 file types; a category
 takes the icon of its content (of its most common kind if it mixes types).
 
-Models are sorted by what they contain (only the file up to the skeleton,
-animation, material and mesh chunk headers is read while scanning):
+Models are sorted into two subfolders by what they contain: **Meshes** for
+model files with geometry or materials, **Animation** for skeletons, clips and
+other rig data (only the file up to the skeleton, animation, material and mesh
+chunk headers is read while scanning):
 
 | Folder | Files | Contents |
 |---|---|---|
-| Models with animation | 57,552 | meshes, and animations to play: its own clips, its skeleton file's clips or animation sets made for its skeleton (the same sources the 3D viewer lists) |
-| Models without animation | 119,563 | meshes, nothing to animate them with |
-| Skeletons | 5,951 | no meshes, own skeleton; other models are bound to these |
-| Bone scales | 64 | `bone` files: body proportions for character creation |
-| Animations | 15,218 | a single ANIM chunk (Granny animation clip) |
-| Animation sets | 1,514 | no meshes, animations for another file's skeleton |
-| Only materials | 344 | materials, no meshes, skeleton or animations |
-| Empty | 30 | neither meshes, materials nor animations, only a skeleton reference |
-Search: file ID (base or file ID, also by prefix) or `#<MFT index>`.
+| Meshes / Models with animation | 57,552 | meshes, and animations to play: its own clips, its skeleton file's clips or animation sets made for its skeleton (the same sources the 3D viewer lists) |
+| Meshes / Models without animation | 119,563 | meshes, nothing to animate them with |
+| Meshes / Only materials | 344 | materials, no meshes, skeleton or animations |
+| Meshes / Empty | 30 | neither meshes, materials nor animations, only a skeleton reference |
+| Animation / Skeletons | 5,951 | no meshes, own skeleton; other models are bound to these |
+| Animation / Animations | 15,218 | a single ANIM chunk (Granny animation clip) |
+| Animation / Animation sets | 1,514 | no meshes, animations for another file's skeleton |
+| Animation / Bone scales | 64 | `bone` files: body proportions for character creation |
+| Animation / Animation sequences | 1 | `anic`: how game actions play their animations (see above) |
+| Animation / Emote animations | 1 | `emoc`: animation files and timings of the 314 emotes (see above) |
+
+Search: file ID (base or file ID, also by prefix), `#<MFT index>`, or part of
+an asset name or path. The 9,188 models with collision and their collision files
+show their original asset name from development (e.g. `Crab.amdl2`, read from
+the model collision manifest); exports of them are named `<asset>_<id>.<ext>`.
 Shortcuts: `Ctrl+O` open, `Ctrl+F` search, arrow keys/PageUp/PageDown in the
 file list.
 
@@ -111,6 +124,9 @@ file list.
 - Bitmap fonts: all 13 character ranges instead of Basic Latin only; glyph files
   are recognised through the font's references instead of a hard-coded ID list.
 - Sound banks: Ogg entries as well as MP3.
+- Paged images: the original listed them only. Pages are ATEP textures or
+  solid colours (stored as BGRA) on a grid; the world map has 80×112 pages
+  (40,960×57,344 pixels).
 - Audio scripts: the original listed them only. gw2formats describes chunk
   version 30; version 33 (all but eight files) adds one dword after
   `channelMax` in each meta sound. All 133,000 meta sounds decode and all
@@ -135,7 +151,7 @@ crates/gw2dat/            core library
   src/inflate/            Huffman/LZ decompression (.dat) and texture decompression
   src/filetype.rs         type detection and categories (table-driven)
   src/index.rs            parallel scan, incremental cache
-  src/formats/            pf (PF container), image, audio, audio_script, model, map, material, shader, text, font, content
+  src/formats/            pf (PF container), image, audio, audio_script, emotes, manifests, model, map, material, paged_image, shader, text, font, content
   examples/               developer tools (see below)
   tests/real_archive.rs   tests against a real Gw2.dat
 src-tauri/                Tauri backend (commands, export)

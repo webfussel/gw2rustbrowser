@@ -145,6 +145,10 @@ fn scan_entry(archive: &Archive, index: u32) -> Result<Option<Scanned>> {
     } else {
         None
     };
+    // Text files are sorted by their content.
+    if matches!(file_type, FileType::Text | FileType::Utf8Text) && head.len() < filetype::TEXT_PEEK_SIZE {
+        head = archive.peek(index, filetype::TEXT_PEEK_SIZE)?;
+    }
     let path = filetype::categorize(file_type, &head, tail);
     Ok(Some(Scanned { mft_index: index, file_type, size, path, reference, has_clips }))
 }
@@ -271,7 +275,7 @@ impl Index {
 
 const CACHE_MAGIC: &[u8; 8] = b"GW2BIDX\0";
 /// Bump whenever file type detection or categorisation changes.
-const CACHE_VERSION: u32 = 16;
+const CACHE_VERSION: u32 = 23;
 
 impl Index {
     pub fn save(&self, path: &Path) -> io::Result<()> {

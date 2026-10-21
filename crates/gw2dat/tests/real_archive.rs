@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use gw2dat::formats::{audio, audio_script, image, map, material, model, shader, text};
+use gw2dat::formats::{audio, audio_script, emotes, image, manifests, map, material, model, paged_image, shader, text};
 use gw2dat::{Archive, FileType, Index, Kind, ScanProgress};
 
 fn archive() -> Option<Archive> {
@@ -48,6 +48,21 @@ fn decodes_a_sample_of_every_kind() {
                     assert!(model::materials(&data).is_ok(), "materials {id}");
                 }
             }
+            Kind::CollisionManifest => {
+                let entries = manifests::collision_manifest(&data).unwrap_or_else(|e| panic!("cmaC {id}: {e}"));
+                assert!(entries.iter().all(|e| e.model.is_some() && e.collision.is_some()), "cmaC files of {id}");
+            }
+            Kind::PortalManifest => {
+                manifests::portal_manifest(&data).unwrap_or_else(|e| panic!("prlt {id}: {e}"));
+            }
+            Kind::Emotes => {
+                let list = emotes::decode(&data).unwrap_or_else(|e| panic!("emotes {id}: {e}"));
+                assert!(list.iter().flat_map(|e| &e.timings).all(|t| t.model.is_some()), "emote models of {id}");
+            }
+            Kind::PagedImage => {
+                let image = paged_image::decode(&data).unwrap_or_else(|e| panic!("paged image {id}: {e}"));
+                assert!(image.pages.iter().all(|p| (p.layer as usize) < image.layers.len()), "page layers of {id}");
+            }
             Kind::AudioScript => {
                 audio_script::decode(&data).unwrap_or_else(|e| panic!("audio script {id}: {e}"));
             }
@@ -88,6 +103,10 @@ fn decodes_a_sample_of_every_kind() {
         FileType::Material,
         FileType::BankIndex,
         FileType::AudioScript,
+        FileType::PagedImageTable,
+        FileType::EmoteAnimation,
+        FileType::ModelCollisionManifest,
+        FileType::GameContentPortalManifest,
     ] {
         assert!(seen.contains_key(&kind), "no {kind:?} found");
     }

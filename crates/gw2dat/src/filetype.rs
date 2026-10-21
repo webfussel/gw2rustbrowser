@@ -62,36 +62,36 @@ file_types! {
     Pf => "PF", "pf", Binary, ["Misc"];
     Manifest => "ARMF", "armf", Binary, ["Manifests"];
     TextPackManifest => "txtm", "txtm", TextPack, ["Manifests", "TextPack"];
-    TextPackVariant => "txtV", "txtv", TextPack, ["TextPack", "Variant"];
-    TextPackVoices => "txtv", "txtvoice", TextPack, ["TextPack", "Voices"];
+    TextPackVariant => "txtV", "txtv", TextPack, ["Texts", "TextPack", "Variant"];
+    TextPackVoices => "txtv", "txtvoice", TextPack, ["Texts", "TextPack", "Voices"];
     Bank => "ABNK", "abnk", SoundBank, ["Sounds", "Soundbanks"];
     BankIndex => "ABIX", "abix", SoundBankIndex, ["Sounds", "Soundbank indexes"];
     AudioScript => "AMSP", "amsp", AudioScript, ["Sounds", "Audio scripts"];
-    Model => "MODL", "modl", Model, ["Models", "Other"];
-    ModelAnimated => "MODL animated", "modl", Model, ["Models", "Models with animation"];
-    ModelStatic => "MODL static", "modl", Model, ["Models", "Models without animation"];
-    ModelSkeleton => "MODL skeleton", "modl", Model, ["Models", "Skeletons"];
-    ModelAnimationSet => "MODL animset", "modl", Model, ["Models", "Animation sets"];
-    ModelMaterials => "MODL materials", "modl", Model, ["Models", "Only materials"];
-    ModelEmpty => "MODL empty", "modl", Model, ["Models", "Empty"];
-    ModelAnimation => "MODL anim", "modl", Animation, ["Models", "Animations"];
-    BoneScale => "bone", "bone", Binary, ["Models", "Bone scales"];
+    Model => "MODL", "modl", Model, ["Models", "Meshes", "Other"];
+    ModelAnimated => "MODL animated", "modl", Model, ["Models", "Meshes", "Models with animation"];
+    ModelStatic => "MODL static", "modl", Model, ["Models", "Meshes", "Models without animation"];
+    ModelSkeleton => "MODL skeleton", "modl", Model, ["Models", "Animation", "Skeletons"];
+    ModelAnimationSet => "MODL animset", "modl", Model, ["Models", "Animation", "Animation sets"];
+    ModelMaterials => "MODL materials", "modl", Model, ["Models", "Meshes", "Only materials"];
+    ModelEmpty => "MODL empty", "modl", Model, ["Models", "Meshes", "Empty"];
+    ModelAnimation => "MODL anim", "modl", Animation, ["Models", "Animation", "Animations"];
+    BoneScale => "bone", "bone", Binary, ["Models", "Animation", "Bone scales"];
     StarField => "STAR", "star", StarField, ["Star fields"];
-    ModelCollisionManifest => "cmaC", "cmac", Binary, ["Manifests", "Model Collision"];
+    ModelCollisionManifest => "cmaC", "cmac", CollisionManifest, ["Manifests", "Model Collision"];
     DependencyTable => "DEPS", "deps", Binary, ["Dependency Tables"];
-    Eula => "eula", "eula", Eula, ["EULA"];
-    GameContent => "cntc", "cntc", Content, ["Game Content"];
-    GameContentPortalManifest => "prlt", "prlt", Binary, ["Manifests", "Game Content Portal"];
+    Eula => "eula", "eula", Eula, ["Texts", "EULA"];
+    GameContent => "cntc", "cntc", Content, ["Texts", "Game Content"];
+    GameContentPortalManifest => "prlt", "prlt", PortalManifest, ["Manifests", "Game Content Portal"];
     MapCollision => "hvkC", "hvkc", Binary, ["Maps", "Collision"];
     MapParam => "mapc", "mapc", Map, ["Maps"];
     MapShadow => "mpsd", "mpsd", Binary, ["Maps", "Shadows"];
     MapMetadata => "mMet", "mmet", Binary, ["Maps", "Metadata"];
-    PagedImageTable => "PIMG", "pimg", Binary, ["Paged Image Table"];
+    PagedImageTable => "PIMG", "pimg", PagedImage, ["Maps", "World Map Tiles"];
     Material => "AMAT", "amat", Material, ["Materials"];
     Composite => "cmpc", "cmpc", Binary, ["Composite Data"];
     Cinematic => "CINP", "cinp", Binary, ["Cinematics"];
-    AnimSequences => "anic", "anic", Sequences, ["Animation Sequences"];
-    EmoteAnimation => "emoc", "emoc", Binary, ["Emote Animations"];
+    AnimSequences => "anic", "anic", Sequences, ["Models", "Animation", "Animation sequences"];
+    EmoteAnimation => "emoc", "emoc", Emotes, ["Models", "Animation", "Emote animations"];
     ShaderCache => "CDHS", "cdhs", Binary, ["Shader Cache"];
     Config => "locl", "locl", Binary, ["Configuration"];
     BitmapFont => "AFNT", "afnt", BitmapFont, ["Fonts", "Bitmap"];
@@ -101,12 +101,12 @@ file_types! {
     Dll => "DLL", "dll", Binary, ["Binaries"];
     Exe => "EXE", "exe", Binary, ["Binaries"];
 
-    Strings => "strs", "strs", Strings, ["Strings"];
+    Strings => "strs", "strs", Strings, ["Texts", "Strings"];
     Font => "font", "ttf", Font, ["Fonts", "TrueType"];
     Bink2Video => "Bink2", "bk2", Binary, ["Bink Videos"];
     Arap => "ARAP", "arap", Binary, ["Misc"];
-    Utf8Text => "UTF-8", "txt", Text, ["Text"];
-    Text => "text", "txt", Text, ["Text"];
+    Utf8Text => "UTF-8", "txt", Text, ["Texts", "Text"];
+    Text => "text", "txt", Text, ["Texts", "Text"];
 }
 
 /// Which viewer/exporter handles a file type.
@@ -119,6 +119,14 @@ pub enum Kind {
     SoundBankIndex,
     /// Sound events, triggers and (in one file) the music playlists.
     AudioScript,
+    /// Large image (world and region maps) assembled from texture pages.
+    PagedImage,
+    /// How each emote plays: animation files and part lengths.
+    Emotes,
+    /// Asset paths of models with their collision files.
+    CollisionManifest,
+    /// Map start points and the models loaded there.
+    PortalManifest,
     Model,
     Animation,
     Strings,
@@ -337,9 +345,177 @@ pub fn categorize(file_type: FileType, head: &[u8], tail: Option<[u8; 2]>) -> Ve
                 path.push(crate::fourcc::display(pf_type));
             }
         }
+        FileType::Text | FileType::Utf8Text => path.push(text_category(head).into()),
         _ => {}
     }
     path
+}
+
+/// How much of a text file [`text_category`] needs.
+pub const TEXT_PEEK_SIZE: usize = 4096;
+
+const HTML_TAGS: &[&str] = &[
+    "html", "head", "body", "div", "script", "link", "meta", "p", "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5", "h6",
+    "table", "span", "style", "section", "form", "iframe", "a", "img", "br", "input", "button", "template", "label",
+    "select", "textarea", "title", "nav", "header", "footer", "main", "article", "b", "i", "em", "strong", "pre",
+    "code",
+];
+const LICENSE_STARTS: &[&str] = &[
+    "apache license",
+    "software license agreement",
+    "the mit license",
+    "mit license",
+    "permission is hereby granted",
+    "bsd license",
+    "gnu general public license",
+    "gnu lesser general public license",
+    "licensed under",
+    "copyright (c)",
+    "copyright ©",
+];
+const LICENSE_SIGNALS: &[&str] = &[
+    "copyright",
+    "all rights reserved",
+    "redistribution and use",
+    "permission is hereby granted",
+    "license",
+    "warranty",
+];
+
+/// Content category of a plain text file from its first [`TEXT_PEEK_SIZE`]
+/// bytes: the language of web files and scripts, licenses, documentation.
+pub fn text_category(head: &[u8]) -> &'static str {
+    let text = String::from_utf8_lossy(head);
+    let text = text.trim_start_matches('\u{feff}');
+    let s = text.trim_start();
+    let low = s.to_lowercase();
+    if low.starts_with("<?php") {
+        return "PHP";
+    }
+    if low.starts_with("<?xml") || low.starts_with("<svg") {
+        return "XML";
+    }
+    let html_tag = low.strip_prefix('<').is_some_and(|rest| {
+        HTML_TAGS.iter().any(|tag| {
+            rest.strip_prefix(tag)
+                .is_some_and(|after| after.starts_with(|c: char| c.is_whitespace() || c == '>' || c == '/'))
+        })
+    });
+    if low.starts_with("<!doctype html")
+        || html_tag
+        || low.starts_with("<!--") && (low.contains("<!doctype html") || low.contains("<html"))
+    {
+        return "HTML";
+    }
+    if low.starts_with("#!") {
+        let first = low.lines().next().unwrap_or("");
+        return if first.contains("node") {
+            "JavaScript"
+        } else if first.contains("python") {
+            "Python"
+        } else {
+            "Shell scripts"
+        };
+    }
+    let license = is_license(&low);
+    if is_documentation(s, &low) && !license {
+        return "Documentation";
+    }
+    if license {
+        return "Licenses";
+    }
+    let after_bracket = s.strip_prefix(['{', '[']).map(str::trim_start);
+    if after_bracket.is_some_and(|rest| rest.is_empty() || rest.starts_with(['"', '[', '{', ']', '}'])) {
+        return "JSON";
+    }
+    // `var` as a keyword, not the CSS class `.var`.
+    let script = has_word(text, "function")
+        || text.match_indices("var").any(|(at, _)| {
+            !text[..at].ends_with(|c: char| c.is_alphanumeric() || c == '_' || c == '.')
+                && text[at + 3..].starts_with(char::is_whitespace)
+        })
+        || text.contains("=>");
+    if is_css(s) && !script {
+        return "CSS";
+    }
+    if low.starts_with("package") && low.contains("import flash.") {
+        return "ActionScript";
+    }
+    let markers = ["YUI.add", "YUI(", "require(", "module.exports", "=>", "use strict", "console."];
+    if ["function", "var", "let", "const", "return", "typeof"].iter().any(|w| has_word(text, w))
+        || markers.iter().any(|m| text.contains(m))
+    {
+        return "JavaScript";
+    }
+    "Plain text"
+}
+
+/// `word` occurs with no letter, digit or `_` directly around it.
+fn has_word(text: &str, word: &str) -> bool {
+    let ident = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+    text.match_indices(word)
+        .any(|(at, _)| !ident(text[..at].chars().next_back()) && !ident(text[at + word.len()..].chars().next()))
+}
+
+fn is_license(low: &str) -> bool {
+    if LICENSE_STARTS.iter().any(|p| low.starts_with(p)) {
+        return true;
+    }
+    // A plain text document (not code) full of license wording.
+    if !low.starts_with(|c: char| c.is_alphanumeric()) {
+        return false;
+    }
+    let mut end = low.len().min(2000);
+    while !low.is_char_boundary(end) {
+        end -= 1;
+    }
+    LICENSE_SIGNALS.iter().filter(|s| low[..end].contains(*s)).count() >= 3
+}
+
+/// Change logs, readme files and Markdown documents.
+fn is_documentation(s: &str, low: &str) -> bool {
+    let mut lines = s.lines();
+    let title = lines.next().unwrap_or("").trim();
+    let underline = lines.next().unwrap_or("").trim();
+    let setext = !title.is_empty()
+        && underline.len() >= 3
+        && (underline.chars().all(|c| c == '=') || underline.chars().all(|c| c == '-'));
+    let hashes = s.len() - s.trim_start_matches('#').len();
+    let heading = (1..=6).contains(&hashes) && s[hashes..].starts_with(' ');
+    low.get(..200).unwrap_or(low).contains("change history") || setext || heading || low.starts_with("readme")
+}
+
+/// Starts (after comments) with a selector, `{` and a property or `}`.
+fn is_css(s: &str) -> bool {
+    let mut rest = s;
+    loop {
+        rest = rest.trim_start();
+        if let Some(comment) = rest.strip_prefix("/*") {
+            let Some(end) = comment.find("*/") else { return false };
+            rest = &comment[end + 2..];
+        } else if rest.starts_with("//") {
+            rest = rest.find('\n').map_or("", |end| &rest[end + 1..]);
+        } else {
+            break;
+        }
+    }
+    if !rest.starts_with(|c: char| c.is_ascii_alphabetic() || "@.#*:[".contains(c)) {
+        return false;
+    }
+    let Some(open) = rest.find(['{', ';', '}']) else { return false };
+    if !rest[open..].starts_with('{') {
+        return false;
+    }
+    let mut body = rest[open + 1..].trim_start();
+    while let Some(comment) = body.strip_prefix("/*") {
+        let Some(end) = comment.find("*/") else { return false };
+        body = comment[end + 2..].trim_start();
+    }
+    if body.starts_with('}') {
+        return true;
+    }
+    let name = body.len() - body.trim_start_matches(|c: char| c.is_ascii_alphabetic() || c == '-').len();
+    name > 0 && body[name..].trim_start().starts_with(':')
 }
 
 #[cfg(test)]
@@ -378,6 +554,37 @@ mod tests {
         assert_eq!(identified(b"\xff\xd8\xff\xe0rest"), FileType::Jpeg);
         assert_eq!(identified(b"RIFF\0\0\0\0WEBPVP8 "), FileType::Webp);
         assert_eq!(identified(b"plain text\n"), FileType::Text);
+    }
+
+    #[test]
+    fn text_categories() {
+        let cases: &[(&str, &str)] = &[
+            ("<!DOCTYPE html>\n<html>", "HTML"),
+            ("<!--\n/*! normalize.css */\n-->\n<!DOCTYPE html>", "HTML"),
+            ("  <div class=\"a\">x</div>", "HTML"),
+            ("<?php\necho 1;", "PHP"),
+            ("<?xml version=\"1.0\"?><a/>", "XML"),
+            ("#!/usr/bin/env node\nvar a;", "JavaScript"),
+            ("YUI.add('datatable', function (Y) {", "JavaScript"),
+            ("console.log(\"a.js\");", "JavaScript"),
+            (".comboLine {\n    /*margin-top: 15px;*/\n    width: 346px;\n}", "CSS"),
+            ("/* reset */\n.authDetails input[type=\"text\"] {\n    width: 150px;\n}", "CSS"),
+            (".pln{color:#000}.dec,.var{color:#606}", "CSS"),
+            ("{\"views\":[{\"height\":1}]}", "JSON"),
+            ("Anim Change History\r\n===================\r\n\r\n3.11.0\r\n------\r\n* function names", "Documentation"),
+            ("# Title\n\ntext", "Documentation"),
+            ("                                 Apache License\n  Version 2.0", "Licenses"),
+            (
+                "\u{feff}THIRDPARTYSOFTWAREREADME.TXT FOR GUILD WARS 2\n\nLZ4 Library\nCopyright (c) 2011-2020, Yann Collet\nAll rights reserved.\n\nRedistribution and use in source and binary forms",
+                "Licenses",
+            ),
+            ("package {\n\timport flash.display.Sprite;", "ActionScript"),
+            ("SUCCESS!\n", "Plain text"),
+            ("undefined", "Plain text"),
+        ];
+        for (text, category) in cases {
+            assert_eq!(text_category(text.as_bytes()), *category, "{text:?}");
+        }
         assert_eq!(identified(&[0, 1, 2, 3, 4]), FileType::Unknown);
     }
 
