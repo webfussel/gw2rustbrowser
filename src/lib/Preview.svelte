@@ -23,6 +23,7 @@
   const meshlessModels = ["MODL skeleton", "MODL animset", "MODL materials", "MODL empty"];
   // three.js is large; load the 3D viewer only when a model is shown.
   const modelViewer = () => import("./viewers/ModelViewer.svelte");
+  const mapViewer = () => import("./viewers/MapViewer.svelte");
 
   type Tab = "preview" | "hex";
 
@@ -46,6 +47,7 @@
     "starfield",
     "sequences",
     "textpack",
+    "map",
   ];
   const hasPreview = $derived(detail !== null && previewKinds.includes(detail.kind));
   const activeTab = $derived<Tab>(hasPreview ? tab : "hex");
@@ -145,6 +147,10 @@
         <TextPackViewer type={d.type} />
       {:else if activeTab === "preview" && d.kind === "sequences"}
         <SequenceViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "map"}
+        {#await mapViewer() then { default: MapViewer }}
+          <MapViewer mft={d.mft} />
+        {/await}
       {:else if activeTab === "preview" && d.kind === "starfield"}
         <StarFieldViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "fontglyphs"}

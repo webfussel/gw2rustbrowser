@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 use std::time::Instant;
 
-use gw2dat::formats::{animation, audio, content, font, image, model, sequences, stars, text, textpack, truetype};
+use gw2dat::formats::{animation, audio, content, font, image, map, model, sequences, stars, text, textpack, truetype};
 use gw2dat::{Archive, FileType, Index, Kind, ScanProgress};
 use rayon::prelude::*;
 
@@ -76,6 +76,7 @@ fn main() -> gw2dat::Result<()> {
             Kind::Font => truetype::info(&data).map(|_| ()).map_err(|e| e.to_string()),
             Kind::StarField => stars::decode(&data).map(|_| ()).map_err(|e| e.to_string()),
             Kind::Sequences => sequences::decode(&data).map(|_| ()).map_err(|e| e.to_string()),
+            Kind::Map => map::decode(&data).map(|_| ()).map_err(|e| e.to_string()),
             Kind::TextPack => match e.file_type {
                 FileType::TextPackManifest => textpack::manifest(&data).map(|_| ()),
                 FileType::TextPackVariant => textpack::variants(&data).map(|_| ()),

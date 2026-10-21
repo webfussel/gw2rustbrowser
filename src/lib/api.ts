@@ -58,6 +58,7 @@ export type Kind =
   | "starfield"
   | "sequences"
   | "textpack"
+  | "map"
   | "binary";
 
 export interface FindResult extends FileInfo {
@@ -321,6 +322,88 @@ function parseModel(buffer: ArrayBuffer): ModelMesh[] {
   return meshes;
 }
 
+export interface MapWaterSurface {
+  z: number;
+  outline: [number, number][];
+}
+
+export interface MapHeader {
+  /** Min x, min y, max x, max y in world units. */
+  rect: [number, number, number, number];
+  columns: number;
+  rows: number;
+  zRange: [number, number] | null;
+  /** Model file id per prop model index. */
+  models: number[];
+  propCount: number;
+  /** Static, animated, instance copies, group members. */
+  propKinds: [number, number, number, number];
+  missingModels: number;
+  water: { plane: boolean; planeZ: number; surfaces: MapWaterSurface[] } | null;
+  chunks: { name: string; version: number; size: number }[];
+}
+
+export interface MapData extends MapHeader {
+  /** World z per terrain sample, row-major, row 0 at the minimum y. */
+  heights: Float32Array<ArrayBuffer>;
+  /** Per prop: model index, position xyz, rotation xyz, scale. */
+  propModels: Uint32Array<ArrayBuffer>;
+  props: Float32Array<ArrayBuffer>;
+}
+
+function parseMap(buffer: ArrayBuffer): MapData {
+  const headerLength = new DataView(buffer).getUint32(0, true);
+  const header: MapHeader = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 4, headerLength)));
+  let offset = Math.ceil((4 + headerLength) / 4) * 4;
+  const heights = new Float32Array(buffer, offset, header.columns * header.rows);
+  offset += heights.byteLength;
+  return {
+    ...header,
+    heights,
+    propModels: new Uint32Array(buffer, offset, header.propCount * 8),
+    props: new Float32Array(buffer, offset, header.propCount * 8),
+  };
+}
+
+export interface PropMesh {
+  positions: Float32Array<ArrayBuffer>;
+  normals: Float32Array<ArrayBuffer> | null;
+  uvs: Float32Array<ArrayBuffer> | null;
+  indices: Uint32Array<ArrayBuffer>;
+  /** Diffuse texture file id. */
+  diffuse: number | null;
+}
+
+function parsePropModel(buffer: ArrayBuffer): PropMesh[] {
+  const view = new DataView(buffer);
+  let offset = 0;
+  const u32 = () => {
+    const v = view.getUint32(offset, true);
+    offset += 4;
+    return v;
+  };
+  const floats = (count: number) => {
+    const array = new Float32Array(buffer, offset, count);
+    offset += count * 4;
+    return array;
+  };
+  const meshes: PropMesh[] = [];
+  const count = u32();
+  for (let i = 0; i < count; i++) {
+    const vertices = u32();
+    const indexCount = u32();
+    const flags = u32();
+    const diffuse = u32();
+    const positions = floats(vertices * 3);
+    const normals = flags & 1 ? floats(vertices * 3) : null;
+    const uvs = flags & 2 ? floats(vertices * 2) : null;
+    const indices = new Uint32Array(buffer, offset, indexCount);
+    offset += indexCount * 4;
+    meshes.push({ positions, normals, uvs, indices, diffuse: diffuse || null });
+  }
+  return meshes;
+}
+
 function parseSound(buffer: ArrayBuffer): SoundData {
   const bytes = new Uint8Array(buffer);
   const mime = new TextDecoder().decode(bytes.subarray(1, 1 + bytes[0]));
@@ -370,6 +453,8 @@ export const api = {
   loadSequences: async (mft: number): Promise<AnimSequence[]> =>
     JSON.parse(new TextDecoder().decode(await invoke<ArrayBuffer>("load_sequences", { mft }))),
   loadStars: (mft: number) => invoke<StarFieldData>("load_stars", { mft }),
+  loadMap: async (mft: number) => parseMap(await invoke<ArrayBuffer>("load_map", { mft })),
+  loadPropModel: async (fileId: number) => parsePropModel(await invoke<ArrayBuffer>("load_prop_model", { fileId })),
   truetypeInfo: (mft: number) => invoke<TrueTypeInfo>("truetype_info", { mft }),
   glyphFileInfo: (mft: number) => invoke<GlyphFileInfo>("glyph_file_info", { mft }),
   glyphFileAtlas: async (mft: number, page: number) => {

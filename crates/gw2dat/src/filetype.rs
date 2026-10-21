@@ -82,10 +82,10 @@ file_types! {
     Eula => "eula", "eula", Eula, ["EULA"];
     GameContent => "cntc", "cntc", Content, ["Game Content"];
     GameContentPortalManifest => "prlt", "prlt", Binary, ["Manifests", "Game Content Portal"];
-    MapCollision => "hvkC", "hvkc", Binary, ["Map Collision"];
-    MapParam => "mapc", "mapc", Binary, ["Map"];
-    MapShadow => "mpsd", "mpsd", Binary, ["Map Shadow"];
-    MapMetadata => "mMet", "mmet", Binary, ["Map Metadata"];
+    MapCollision => "hvkC", "hvkc", Binary, ["Maps", "Collision"];
+    MapParam => "mapc", "mapc", Map, ["Maps"];
+    MapShadow => "mpsd", "mpsd", Binary, ["Maps", "Shadows"];
+    MapMetadata => "mMet", "mmet", Binary, ["Maps", "Metadata"];
     PagedImageTable => "PIMG", "pimg", Binary, ["Paged Image Table"];
     Material => "AMAT", "amat", Binary, ["Materials"];
     Composite => "cmpc", "cmpc", Binary, ["Composite Data"];
@@ -132,6 +132,8 @@ pub enum Kind {
     Sequences,
     /// Text index, text variants and voice lines.
     TextPack,
+    /// Terrain, props and water of a map.
+    Map,
     Binary,
 }
 

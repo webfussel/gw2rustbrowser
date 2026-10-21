@@ -24,7 +24,7 @@ pub async fn blocking<T: Send + 'static>(work: impl FnOnce() -> CmdResult<T> + S
     tauri::async_runtime::spawn_blocking(work).await.map_err(|e| e.to_string())?
 }
 
-fn err(e: impl std::fmt::Display) -> String {
+pub fn err(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
 

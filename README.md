@@ -39,6 +39,7 @@ the window.
 | TrueType fonts (10 files) | Specimen in the font itself: sample text in several sizes, every mapped character | TTF |
 | Star fields (STAR, 2 files) | Sky chart (dome or panorama), stars sized by brightness, colouring by the unknown values, values on hover | CSV |
 | Animation sequences (anic) | Searchable table of 1,853 sequences / 8,858 variants: steps, movement, blend times, timeline with triggers, charge stages | JSON |
+| Maps (mapc, 287 files) | 3D view: terrain heightmap coloured by height and slope, sea level and lakes, props as textured models (loaded within a draw distance around the focus point with markers for the rest, or all at once); click a prop for its model id; size, prop and chunk overview | 16-bit heightmap PNG |
 | TextPack (txtm manifest, txtV variants, txtv voices) | Every game text by ID and language, full-text search, jump to ID; text variants side by side; voice lines with playback from the sound banks (only playable by default) | raw |
 | Text, everything else | Text or hex view | raw |
 
@@ -107,6 +108,10 @@ file list.
 - Bitmap fonts: all 13 character ranges instead of Basic Latin only; glyph files
   are recognised through the font's references instead of a hard-coded ID list.
 - Sound banks: Ogg entries as well as MP3.
+- Maps: the original's map reader stopped after locating the heightmap. Terrain
+  is now assembled from its chunks (32 or 64 tiles per chunk, three overlapping
+  samples per edge, rows stored from maximum to minimum y, holes marked with 10000),
+  props are placed with their Direct3D yaw-pitch-roll rotation, and water is read.
 
 ## Architecture
 
@@ -116,7 +121,7 @@ crates/gw2dat/            core library
   src/inflate/            Huffman/LZ decompression (.dat) and texture decompression
   src/filetype.rs         type detection and categories (table-driven)
   src/index.rs            parallel scan, incremental cache
-  src/formats/            pf (PF container), image, audio, model, text, font, content
+  src/formats/            pf (PF container), image, audio, model, map, text, font, content
   examples/               developer tools (see below)
   tests/real_archive.rs   tests against a real Gw2.dat
 src-tauri/                Tauri backend (commands, export)
@@ -151,8 +156,11 @@ GW2_DAT=$PWD/res/Gw2.dat cargo test --release -p gw2dat --test real_archive
   texts are readable in total.
 - The first time a TextPack voices file is opened, all sound banks are scanned
   for voice IDs (~20 s); the result is cached next to the index cache.
-- Map files, animations, skeletons and collision data are only listed and
-  exported raw. The original could not display them either.
+- Map collision, map shadow and map metadata files, skeletons and model
+  collision data are only listed and exported raw. The original could not
+  display them either.
+- The map view colours the terrain by height; the terrain's own texture
+  layers (`trni`, paged images) and lights, decals and zones are not drawn yet.
 - The 3D view shows diffuse textures only. Materials (AMAT shaders) are not
   replicated.
 

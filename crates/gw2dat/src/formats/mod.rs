@@ -6,6 +6,7 @@ pub mod content;
 pub mod font;
 pub mod granny;
 pub mod image;
+pub mod map;
 pub mod model;
 pub mod pf;
 pub mod sequences;
@@ -52,6 +53,7 @@ pub fn convert(file_type: FileType, data: Vec<u8>) -> Result<Converted> {
             Converted { data: sequences::to_json(&sequences::decode(&data)?).into_bytes(), extension: "json" }
         }
         Kind::StarField => Converted { data: stars::to_csv(&stars::decode(&data)?).into_bytes(), extension: "csv" },
+        Kind::Map => Converted { data: map::heightmap_png(&map::decode(&data)?)?, extension: "png" },
         Kind::Model => Converted { data: model::to_obj(&model::decode(&data)?, "").into_bytes(), extension: "obj" },
         _ => Converted { data, extension: file_type.extension() },
     };
@@ -92,6 +94,7 @@ pub fn converted_extension(file_type: FileType) -> &'static str {
             Kind::Font => "ttf",
             Kind::StarField => "csv",
             Kind::Sequences => "json",
+            Kind::Map => "png",
             _ => file_type.extension(),
         },
     }

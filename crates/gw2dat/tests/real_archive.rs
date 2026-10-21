@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use gw2dat::formats::{audio, image, model, text};
+use gw2dat::formats::{audio, image, map, model, text};
 use gw2dat::{Archive, FileType, Index, Kind, ScanProgress};
 
 fn archive() -> Option<Archive> {
@@ -48,6 +48,17 @@ fn decodes_a_sample_of_every_kind() {
                     assert!(model::materials(&data).is_ok(), "materials {id}");
                 }
             }
+            Kind::Map => {
+                let m = map::decode(&data).unwrap_or_else(|e| panic!("map {id}: {e}"));
+                if let Some(t) = &m.terrain {
+                    assert_eq!(t.heights.len(), t.columns * t.rows, "terrain {id}");
+                }
+                // Props lie on the map (a few decorations reach past its edge).
+                let [x0, y0, x1, y1] = m.rect;
+                let inside =
+                    m.props.iter().filter(|p| (x0..=x1).contains(&p.position[0]) && (y0..=y1).contains(&p.position[1]));
+                assert!(inside.count() * 10 >= m.props.len() * 9, "props of map {id}");
+            }
             _ => {}
         }
     }
@@ -58,6 +69,7 @@ fn decodes_a_sample_of_every_kind() {
         FileType::ModelAnimated,
         FileType::ModelAnimation,
         FileType::Strings,
+        FileType::MapParam,
     ] {
         assert!(seen.contains_key(&kind), "no {kind:?} found");
     }

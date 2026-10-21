@@ -1,6 +1,7 @@
 mod commands;
 mod export;
 mod font_export;
+mod map_view;
 mod model_export;
 mod rig;
 mod session;
@@ -49,6 +50,8 @@ pub fn run() {
             commands::font_atlas,
             commands::truetype_info,
             commands::load_stars,
+            map_view::load_map,
+            map_view::load_prop_model,
             commands::load_sequences,
             commands::textpack_info,
             commands::text_rows,

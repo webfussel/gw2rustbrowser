@@ -155,6 +155,7 @@ const byKind: Record<string, IconSpec> = {
   starfield: spec(MoonStar, "map", "Star fields"),
   sequences: spec(ListVideo, "animation", "Animation sequences"),
   textpack: spec(Languages, "text", "Text packs"),
+  map: spec(Map, "map", "Maps"),
   binary: spec(Binary, "code", "Binary data"),
 };
 
