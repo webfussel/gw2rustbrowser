@@ -58,6 +58,7 @@ export type Kind =
   | "mapshadow"
   | "mapmetadata"
   | "composite"
+  | "cinematic"
   | "model"
   | "animation"
   | "strings"
@@ -376,6 +377,45 @@ function parseMap(buffer: ArrayBuffer): MapData {
     propModels: new Uint32Array(buffer, offset, header.propCount * 8),
     props: new Float32Array(buffer, offset, header.propCount * 8),
   };
+}
+
+export interface SceneTrack {
+  name: string;
+  kind: number;
+  /** [time, value] of curve keys. */
+  curve: [number, number][];
+  /** [time, value] of flag keys. */
+  flags: [number, number][];
+  triggers: { time: number; token1: string; token2: string; values: [number, number, number, number] }[];
+}
+
+export interface SceneGroup {
+  name: string;
+  kind: number;
+  kindName: string;
+  flags: number;
+  properties: number;
+  tracks: SceneTrack[];
+}
+
+export interface SceneData {
+  version: number;
+  startingSequence: string;
+  sequences: {
+    name: string;
+    map: string;
+    clientMap: string;
+    length: number;
+    flags: number;
+    environmentMap: FileRef | null;
+    groups: SceneGroup[];
+  }[];
+  texts: { name: string; index: number; voice: number; text: string }[];
+  files: [string, FileRef | null][];
+  scripts: [string, number][];
+  /** ground, sky, fill, hemispherical: [intensity, rgb]. */
+  ambientLights: { name: string; colors: [number, [number, number, number]][] }[];
+  species: { name: string; model: string; variant: string }[];
 }
 
 export interface CompositeInfo {
@@ -793,6 +833,7 @@ export const api = {
   },
   modelMaterials: (mft: number) => invoke<ModelMaterial[]>("model_materials", { mft }),
   loadSound: async (mft: number) => parseSound(await invoke<ArrayBuffer>("load_sound", { mft })),
+  sceneInfo: (mft: number) => invoke<SceneData>("scene_info", { mft }),
   compositeInfo: (mft: number) => invoke<CompositeInfo>("composite_info", { mft }),
   compositeRace: (mft: number, index: number) => invoke<CompositeRace>("composite_race", { mft, index }),
   collisionInfo: (mft: number) => invoke<CollisionData>("collision_info", { mft }),

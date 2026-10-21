@@ -5,8 +5,8 @@
 use std::collections::HashMap;
 
 use gw2dat::formats::{
-    audio, audio_script, collision, composite, emotes, image, manifests, map, map_data, material, model, paged_image,
-    shader, text,
+    audio, audio_script, cinematic, collision, composite, emotes, image, manifests, map, map_data, material, model,
+    paged_image, shader, text,
 };
 use gw2dat::{Archive, FileType, Index, Kind, ScanProgress};
 
@@ -51,6 +51,10 @@ fn decodes_a_sample_of_every_kind() {
                     assert!(model::materials(&data).is_ok(), "materials {id}");
                 }
             }
+            Kind::Cinematic => match cinematic::decode(&data) {
+                Ok(_) | Err(gw2dat::Error::Unsupported(_)) => {}
+                Err(e) => panic!("CINP {id}: {e}"),
+            },
             Kind::Composite => {
                 let c = composite::decode(&data).unwrap_or_else(|e| panic!("cmpc {id}: {e}"));
                 assert!(c.races.iter().any(|r| r.name == "HumanFemale"), "cmpc {id} races");
@@ -132,6 +136,7 @@ fn decodes_a_sample_of_every_kind() {
         FileType::MapShadow,
         FileType::MapMetadata,
         FileType::Composite,
+        FileType::Cinematic,
     ] {
         assert!(seen.contains_key(&kind), "no {kind:?} found");
     }

@@ -17,6 +17,7 @@
   import ShadowViewer from "./viewers/ShadowViewer.svelte";
   import MapMetadataViewer from "./viewers/MapMetadataViewer.svelte";
   import CompositeViewer from "./viewers/CompositeViewer.svelte";
+  import CinematicViewer from "./viewers/CinematicViewer.svelte";
   import StringsViewer from "./viewers/StringsViewer.svelte";
   import EulaViewer from "./viewers/EulaViewer.svelte";
   import FontViewer from "./viewers/FontViewer.svelte";
@@ -59,6 +60,7 @@
     "mapshadow",
     "mapmetadata",
     "composite",
+    "cinematic",
     "strings",
     "eula",
     "model",
@@ -161,6 +163,8 @@
         {/await}
       {:else if activeTab === "preview" && d.kind === "mapshadow"}
         <ShadowViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "cinematic"}
+        <CinematicViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "composite"}
         <CompositeViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "mapmetadata"}

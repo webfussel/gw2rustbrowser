@@ -3,6 +3,7 @@
 pub mod animation;
 pub mod audio;
 pub mod audio_script;
+pub mod cinematic;
 pub mod collision;
 pub mod composite;
 pub mod content;
@@ -25,7 +26,7 @@ pub mod text;
 pub mod textpack;
 pub mod truetype;
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::filetype::{FileType, Kind};
 
 /// A file converted to a common format for export.
@@ -88,6 +89,12 @@ pub fn convert(file_type: FileType, data: Vec<u8>) -> Result<Converted> {
             let rows: String = map_data::metadata(&data)?.iter().map(|(id, kind)| format!("{id},{kind}\n")).collect();
             Converted { data: format!("map_id,map_type\n{rows}").into_bytes(), extension: "csv" }
         }
+        // Older scene versions are not decoded: export them unchanged.
+        Kind::Cinematic => match cinematic::decode(&data) {
+            Ok(scene) => Converted { data: cinematic::to_text(&scene).into_bytes(), extension: "txt" },
+            Err(Error::Unsupported(_)) => Converted { data, extension: file_type.extension() },
+            Err(e) => return Err(e),
+        },
         Kind::Map => Converted { data: map::heightmap_png(&map::decode(&data)?)?, extension: "png" },
         Kind::Material => {
             Converted { data: material::to_text(&material::decode(&data)?).into_bytes(), extension: "txt" }
@@ -133,6 +140,7 @@ pub fn converted_extension(file_type: FileType) -> &'static str {
             Kind::StarField => "csv",
             Kind::Sequences => "json",
             Kind::Map | Kind::MapShadow => "png",
+            Kind::Cinematic => "txt",
             Kind::Collision => "obj",
             Kind::MapMetadata => "csv",
             Kind::CollisionManifest | Kind::PortalManifest => "csv",

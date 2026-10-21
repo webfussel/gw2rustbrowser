@@ -7,8 +7,8 @@ use std::sync::Mutex;
 use std::time::Instant;
 
 use gw2dat::formats::{
-    animation, audio, audio_script, collision, composite, content, emotes, font, image, manifests, map, map_data,
-    material, model, paged_image, sequences, stars, text, textpack, truetype,
+    animation, audio, audio_script, cinematic, collision, composite, content, emotes, font, image, manifests, map,
+    map_data, material, model, paged_image, sequences, stars, text, textpack, truetype,
 };
 use gw2dat::{Archive, FileType, Index, Kind, ScanProgress};
 use rayon::prelude::*;
@@ -79,6 +79,11 @@ fn main() -> gw2dat::Result<()> {
             Kind::Font => truetype::info(&data).map(|_| ()).map_err(|e| e.to_string()),
             Kind::StarField => stars::decode(&data).map(|_| ()).map_err(|e| e.to_string()),
             Kind::Sequences => sequences::decode(&data).map(|_| ()).map_err(|e| e.to_string()),
+            // Only scene versions 35 and 36 are decoded.
+            Kind::Cinematic => match cinematic::decode(&data) {
+                Err(gw2dat::Error::Unsupported(_)) => Ok(()),
+                other => other.map(|_| ()).map_err(|e| e.to_string()),
+            },
             Kind::Composite => composite::decode(&data).map(|_| ()).map_err(|e| e.to_string()),
             Kind::Collision => collision::decode(&data).map(|_| ()).map_err(|e| e.to_string()),
             Kind::MapShadow => map_data::shadow(&data).map(|_| ()).map_err(|e| e.to_string()),

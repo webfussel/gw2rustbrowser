@@ -89,7 +89,7 @@ file_types! {
     PagedImageTable => "PIMG", "pimg", PagedImage, ["Maps", "World Map Tiles"];
     Material => "AMAT", "amat", Material, ["Materials"];
     Composite => "cmpc", "cmpc", Composite, ["Composite Data"];
-    Cinematic => "CINP", "cinp", Binary, ["Cinematics"];
+    Cinematic => "CINP", "cinp", Cinematic, ["Cinematics"];
     AnimSequences => "anic", "anic", Sequences, ["Models", "Animation", "Animation sequences"];
     EmoteAnimation => "emoc", "emoc", Emotes, ["Models", "Animation", "Emote animations"];
     ShaderCache => "CDHS", "cdhs", Binary, ["Shader Cache"];
@@ -135,6 +135,8 @@ pub enum Kind {
     MapMetadata,
     /// How player characters are composed: races, parts, variants.
     Composite,
+    /// Cinematic scene: sequences, tracks, dialogue.
+    Cinematic,
     Model,
     Animation,
     Strings,

@@ -152,6 +152,7 @@ const byKind: Record<string, IconSpec> = {
   mapshadow: spec(SunDim, "map", "Map shadows"),
   mapmetadata: spec(MapPin, "map", "Map metadata"),
   composite: spec(PersonStanding, "model", "Character composition"),
+  cinematic: spec(Clapperboard, "video", "Cinematics"),
   model: spec(Box, "model", "Models"),
   animation: spec(PersonStanding, "animation", "Animations"),
   strings: spec(Languages, "text", "Strings"),

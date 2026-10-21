@@ -1,4 +1,5 @@
 mod audio_script_view;
+mod cinematic_view;
 mod commands;
 mod composite_view;
 mod emote_view;
@@ -44,6 +45,7 @@ pub fn run() {
             commands::load_bank,
             commands::load_bank_index,
             audio_script_view::audio_script_info,
+            cinematic_view::scene_info,
             composite_view::composite_info,
             composite_view::composite_race,
             emote_view::emote_info,
