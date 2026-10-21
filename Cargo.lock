@@ -1220,6 +1220,8 @@ dependencies = [
 name = "gw2dat"
 version = "0.1.0"
 dependencies = [
+ "brotli-decompressor",
+ "flate2",
  "image",
  "rayon",
  "texture2ddecoder",

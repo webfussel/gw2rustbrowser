@@ -25,9 +25,9 @@ the window.
 
 | Area | Preview | Export (converted) |
 |---|---|---|
-| Textures (ATEX/ATTX/ATEP/ATEU/ATEC/ATET: DXT1–5, DXTA, DXTL, DXTN, 3DCX, BC7) | Zoom, pan, channels R/G/B/A, backgrounds | PNG |
+| Textures (ATEX/ATTX/ATEP/ATEU/ATEC/ATET/CTEU: DXT1–5, DXTA, DXTL, DXTN, 3DCX, BC7) | Zoom, pan, channels R/G/B/A, backgrounds | PNG |
 | DDS (DXT, RGB16/24/32, L8, V8U8, R32F), JPEG, PNG, WebP | as above | PNG |
-| Sounds (PF ASND MP3/Ogg, asnd, MP3, Ogg) | Player | MP3/Ogg |
+| Sounds (PF ASND MP3/Ogg, asnd, MP3 (also without ID3 tag), Ogg) | Player | MP3/Ogg |
 | Sound banks (ABNK) | List of all entries, play and export individually | one file per playable entry |
 | Sound bank indexes (ABIX) | Which bank file holds each bank number per voice language; pick a bank and play its sounds right there (banks of voice languages that are not installed are marked) | CSV |
 | Audio scripts (AMSP, 21,149 files) | Sound events with their candidate files (playable), volume/pitch ranges, fades, looping and playback settings; trigger keys (cues at animation times), handlers with byte code, script references, properties; the global audio settings script lists all 1,816 music playlists with playable tracks | TXT |
@@ -38,7 +38,7 @@ the window.
 | Game content (cntc) | XML with syntax highlighting | XML |
 | Bitmap fonts (AFNT) | Glyph atlas per font and character range | PNG per font and range |
 | Glyph files of bitmap fonts | Glyph atlas with character range and the fonts using it | PNG |
-| TrueType fonts (10 files) | Specimen in the font itself: sample text in several sizes, every mapped character | TTF |
+| Fonts: TrueType (10 files), WOFF and EOT (1 each, under Fonts) | Specimen in the font itself: sample text in several sizes, every mapped character; WOFF is unpacked to TrueType; the EOT font is compressed with MicroType Express, so only the names from its header are shown | TTF (TrueType and WOFF; EOT raw) |
 | Star fields (STAR, 2 files) | Sky chart (dome or panorama), stars sized by brightness, colouring by the unknown values, values on hover | CSV |
 | Animation sequences (anic) | Searchable table of 1,853 sequences / 8,858 variants: steps, movement, blend times, timeline with triggers, charge stages | JSON |
 | Emote animations (emoc, 1 file, 314 emotes) | Searchable emote list; per emote its variants (one per body type, mount or prop) with the animation file (jump to it), intro/loop/outro timeline, blend times, start offset; the selected variant's model in 3D or its summary | CSV |
@@ -54,12 +54,17 @@ the window.
 | World map tiles (PIMG, 3,298 files, under Maps) | Pan and zoom like a map: an overview of the whole layer, sharper pages load as you zoom in (up to the full 512×512 per page); layers, page and texture under the cursor | PNG of a layer at a chosen pixels-per-page |
 | TextPack (txtm manifest, txtV variants, txtv voices) | Every game text by ID and language, full-text search, jump to ID; text variants side by side; voice lines with playback from the sound banks (only playable by default) | raw |
 | Text files (2,688, sorted by content: HTML, JavaScript, CSS, JSON, XML, PHP, ActionScript, licenses, documentation, plain text; mostly the YUI 3 web library the game ships for its web UI) | Text view with syntax highlighting (HTML/XML with embedded JS and CSS, JavaScript, CSS, JSON, PHP, Markdown, ActionScript; files up to 1 MiB) | raw |
+| Bink 2 videos (KB2, 153 files) | Resolution, frame rate, frame count, duration, audio tracks, bit rate. **Not playable**: Bink 2 is RAD Game Tools' proprietary codec without an open decoder, so the preview says so and points to RAD Video Tools | raw (`.bk2`) |
+| Web browser: resource packs (Chromium `.pak` v5, 4 files) | Every resource by id and content kind (PNG/WebP/SVG images, HTML, JavaScript, CSS, JSON, text, fonts); gzip and Chromium's brotli compression are unpacked; images, highlighted text or hex per resource | raw |
+| Web browser: ICU data (`icudt71l`, 1 file) | Copyright, versions, the 2,124 entries grouped by tree (locales, collation, break rules, …) with sizes | raw |
+| Web browser: V8 snapshots (2 files) | V8 version (10.3.174.18, i.e. Chromium 103), contexts, checksum | raw |
+| Web browser: Flash movies (SWF, 2 files) | SWF version, compression, stage size, frame rate and count (not played: Flash Player is discontinued) | raw |
 | Everything else | Hex view | raw |
 
 Every file can also be exported raw (decompressed). Whole categories or search
 results are exported in parallel with a progress bar.
 
-Tree and file list show an icon for each of the 67 file types; a category
+Tree and file list show an icon for each of the 73 file types; a category
 takes the icon of its content (of its most common kind if it mixes types).
 
 Models are sorted into two subfolders by what they contain: **Meshes** for
@@ -156,7 +161,7 @@ crates/gw2dat/            core library
   src/inflate/            Huffman/LZ decompression (.dat) and texture decompression
   src/filetype.rs         type detection and categories (table-driven)
   src/index.rs            parallel scan, incremental cache
-  src/formats/            pf (PF container), image, audio, audio_script, cinematic, collision, composite, emotes, manifests, model, map, map_data, material, paged_image, shader, text, font, content
+  src/formats/            pf (PF container), image, audio, audio_script, cinematic, collision, composite, emotes, manifests, model, map, map_data, material, paged_image, shader, text, font, truetype (TrueType, WOFF, EOT), content, media (Bink 2, SWF headers), web (Chromium PAK, ICU, V8)
   examples/               developer tools (see below)
   tests/real_archive.rs   tests against a real Gw2.dat
 src-tauri/                Tauri backend (commands, export)
@@ -199,6 +204,11 @@ GW2_DAT=$PWD/res/Gw2.dat cargo test --release -p gw2dat --test real_archive
   but how their 64×64 16-bit samples are encoded is not known yet.
 - The map view colours the terrain by height; the terrain's own texture
   layers (`trni`, paged images) and lights, decals and zones are not drawn yet.
+- Bink 2 videos cannot be played: the codec is proprietary to RAD Game Tools
+  and there is no open decoder. Export them raw and play them with RAD Video
+  Tools.
+- The EOT font is compressed with MicroType Express, which is not decoded.
+  Flash movies are not played.
 - The 3D view shows diffuse textures only. Materials (AMAT shaders) are not
   replicated.
 

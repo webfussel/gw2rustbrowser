@@ -2,7 +2,8 @@
   import { api, type TrueTypeInfo } from "../api";
   import { errorMessage } from "../format";
 
-  let { mft }: { mft: number } = $props();
+  /** `type`: file type name (`font`, `WOFF` or `EOT`). */
+  let { mft, type = "font" }: { mft: number; type?: string } = $props();
 
   const family = $derived(`gw2-font-${mft}`);
   let info = $state<TrueTypeInfo | null>(null);
@@ -16,10 +17,14 @@
     let face: FontFace | null = null;
     ready = false;
     error = null;
-    Promise.all([api.truetypeInfo(mft), api.readFile(mft)])
-      .then(async ([fontInfo, bytes]) => {
+    api
+      .truetypeInfo(mft)
+      .then(async (fontInfo) => {
         if (stale) return;
         info = fontInfo;
+        if (fontInfo.compressed) return;
+        const bytes = await api.fontData(mft);
+        if (stale) return;
         face = new FontFace(family, bytes.slice().buffer);
         await face.load();
         if (stale) return;
@@ -34,6 +39,7 @@
   });
 
   const hex = (c: number) => `U+${c.toString(16).toUpperCase().padStart(4, "0")}`;
+  const formats: Record<string, string> = { font: "TrueType", WOFF: "WOFF", EOT: "Embedded OpenType" };
   const displayName = $derived(info?.fullName || info?.family || "Name hidden by the font");
 </script>
 
@@ -46,12 +52,19 @@
     <header>
       <h2>{displayName}</h2>
       <p class="muted">
-        TrueType · {info.glyphs} glyphs · {info.characters.length} characters{info.subfamily ? ` · ${info.subfamily}` : ""}
+        {formats[type] ?? type}{info.compressed
+          ? ""
+          : ` · ${info.glyphs} glyphs · ${info.characters.length} characters`}{info.subfamily ? ` · ${info.subfamily}` : ""}
       </p>
       {#if info.version}<p class="version muted">{info.version}</p>{/if}
     </header>
 
-    {#if ready}
+    {#if info.compressed}
+      <p class="notice">
+        The font data is compressed with MicroType Express, a compression of Embedded OpenType fonts that is not
+        decoded here, so only the names from the EOT header are shown. The export keeps the file unchanged.
+      </p>
+    {:else if ready}
       <section>
         <input type="text" bind:value={sample} aria-label="Sample text" />
         {#each sizes as size}
@@ -163,6 +176,13 @@
   .code {
     font-size: 9px;
     color: var(--faint);
+  }
+
+  .notice {
+    max-width: 70ch;
+    margin-top: 20px;
+    line-height: 1.5;
+    color: var(--muted);
   }
 
   .error {

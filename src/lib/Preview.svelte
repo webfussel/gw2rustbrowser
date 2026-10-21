@@ -30,6 +30,11 @@
   import MaterialViewer from "./viewers/MaterialViewer.svelte";
   import SequenceViewer from "./viewers/SequenceViewer.svelte";
   import TextPackViewer from "./viewers/TextPackViewer.svelte";
+  import BinkViewer from "./viewers/BinkViewer.svelte";
+  import FlashViewer from "./viewers/FlashViewer.svelte";
+  import PakViewer from "./viewers/PakViewer.svelte";
+  import IcuViewer from "./viewers/IcuViewer.svelte";
+  import V8SnapshotViewer from "./viewers/V8SnapshotViewer.svelte";
 
   /** Model types without meshes get a summary instead of the 3D view. */
   const meshlessModels = ["MODL skeleton", "MODL animset", "MODL materials", "MODL empty"];
@@ -73,6 +78,11 @@
     "textpack",
     "map",
     "material",
+    "video",
+    "flash",
+    "resourcepack",
+    "icudata",
+    "v8snapshot",
   ];
   const hasPreview = $derived(detail !== null && previewKinds.includes(detail.kind));
   const activeTab = $derived<Tab>(hasPreview ? tab : "hex");
@@ -192,7 +202,17 @@
       {:else if activeTab === "preview" && d.kind === "bitmapfont"}
         <FontViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "font"}
-        <TrueTypeViewer mft={d.mft} />
+        <TrueTypeViewer mft={d.mft} type={d.type} />
+      {:else if activeTab === "preview" && d.kind === "video"}
+        <BinkViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "flash"}
+        <FlashViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "resourcepack"}
+        <PakViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "icudata"}
+        <IcuViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "v8snapshot"}
+        <V8SnapshotViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "textpack"}
         <TextPackViewer type={d.type} />
       {:else if activeTab === "preview" && d.kind === "sequences"}

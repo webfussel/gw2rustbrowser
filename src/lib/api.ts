@@ -73,6 +73,11 @@ export type Kind =
   | "textpack"
   | "map"
   | "material"
+  | "video"
+  | "flash"
+  | "resourcepack"
+  | "icudata"
+  | "v8snapshot"
   | "binary";
 
 export interface FindResult extends FileInfo {
@@ -254,6 +259,66 @@ export interface TrueTypeInfo {
   version: string;
   glyphs: number;
   characters: number[];
+  /** EOT compressed with MicroType Express: only the header names are known. */
+  compressed: boolean;
+}
+
+export interface BinkInfo {
+  revision: string;
+  frames: number;
+  largestFrame: number;
+  width: number;
+  height: number;
+  fps: number;
+  /** Seconds. */
+  duration: number;
+  flags: number;
+  audioTracks: number;
+  size: number;
+}
+
+export interface FlashInfo {
+  compression: string;
+  version: number;
+  /** Uncompressed length in bytes. */
+  length: number;
+  /** Missing for LZMA-compressed movies. */
+  width: number | null;
+  height: number | null;
+  frameRate: number | null;
+  frames: number | null;
+}
+
+export interface PakResource {
+  id: number;
+  size: number;
+  aliasOf: number | null;
+  /** Content kind (png, css, …) of the unpacked data. */
+  kind: string;
+  compression: "gzip" | "brotli" | null;
+}
+
+export interface PakInfo {
+  version: number;
+  /** 0 binary, 1 UTF-8, 2 UTF-16. */
+  encoding: number;
+  resources: PakResource[];
+}
+
+export interface IcuInfo {
+  formatVersion: string;
+  dataVersion: string;
+  copyright: string;
+  /** (name, size). */
+  entries: [string, number][];
+}
+
+export interface V8Info {
+  contexts: number;
+  rehashable: boolean;
+  checksum: number;
+  version: string;
+  size: number;
 }
 
 export interface GlyphFileInfo {
@@ -816,6 +881,13 @@ export const api = {
   loadMap: async (mft: number) => parseMap(await invoke<ArrayBuffer>("load_map", { mft })),
   loadPropModel: async (fileId: number) => parsePropModel(await invoke<ArrayBuffer>("load_prop_model", { fileId })),
   truetypeInfo: (mft: number) => invoke<TrueTypeInfo>("truetype_info", { mft }),
+  fontData: async (mft: number) => new Uint8Array(await invoke<ArrayBuffer>("font_data", { mft })),
+  binkInfo: (mft: number) => invoke<BinkInfo>("bink_info", { mft }),
+  flashInfo: (mft: number) => invoke<FlashInfo>("flash_info", { mft }),
+  pakInfo: (mft: number) => invoke<PakInfo>("pak_info", { mft }),
+  pakResource: async (mft: number, id: number) => new Uint8Array(await invoke<ArrayBuffer>("pak_resource", { mft, id })),
+  icuInfo: (mft: number) => invoke<IcuInfo>("icu_info", { mft }),
+  v8Info: (mft: number) => invoke<V8Info>("v8_info", { mft }),
   glyphFileInfo: (mft: number) => invoke<GlyphFileInfo>("glyph_file_info", { mft }),
   glyphFileAtlas: async (mft: number, page: number) => {
     const image = parseImage(await invoke<ArrayBuffer>("glyph_file_atlas", { mft, page }));

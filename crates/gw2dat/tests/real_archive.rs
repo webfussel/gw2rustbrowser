@@ -5,8 +5,8 @@
 use std::collections::HashMap;
 
 use gw2dat::formats::{
-    audio, audio_script, cinematic, collision, composite, emotes, image, manifests, map, map_data, material, model,
-    paged_image, shader, text,
+    audio, audio_script, cinematic, collision, composite, emotes, image, manifests, map, map_data, material, media,
+    model, paged_image, shader, text, truetype, web,
 };
 use gw2dat::{Archive, FileType, Index, Kind, ScanProgress};
 
@@ -50,6 +50,35 @@ fn decodes_a_sample_of_every_kind() {
                     }
                     assert!(model::materials(&data).is_ok(), "materials {id}");
                 }
+            }
+            Kind::Video => {
+                let b = media::bink(&data).unwrap_or_else(|e| panic!("Bink {id}: {e}"));
+                assert!(b.width > 0 && b.height > 0 && b.fps() > 0.0, "Bink header of {id}");
+            }
+            Kind::Flash => {
+                media::flash(&data).unwrap_or_else(|e| panic!("SWF {id}: {e}"));
+            }
+            Kind::ResourcePack => {
+                let pak = web::pak(&data).unwrap_or_else(|e| panic!("PAK {id}: {e}"));
+                for r in &pak.resources {
+                    web::decompress(&data[r.offset..r.offset + r.size])
+                        .unwrap_or_else(|e| panic!("PAK {id}/{}: {e}", r.id));
+                }
+            }
+            Kind::IcuData => {
+                let icu = web::icu(&data).unwrap_or_else(|e| panic!("ICU {id}: {e}"));
+                assert!(icu.copyright.starts_with("Copyright") && !icu.entries.is_empty(), "ICU {id}");
+            }
+            Kind::V8Snapshot => {
+                let v8 = web::v8_snapshot(&data).unwrap_or_else(|e| panic!("V8 {id}: {e}"));
+                assert_eq!(v8.version.split('.').count(), 4, "V8 version of {id}");
+            }
+            Kind::Font if truetype::is_compressed_eot(&data) => {
+                truetype::eot_info(&data).unwrap_or_else(|e| panic!("EOT {id}: {e}"));
+            }
+            Kind::Font => {
+                let sfnt = truetype::to_sfnt(&data).unwrap_or_else(|e| panic!("font {id}: {e}"));
+                assert!(truetype::info(&sfnt).is_ok_and(|i| i.glyphs > 0), "font {id}");
             }
             Kind::Cinematic => match cinematic::decode(&data) {
                 Ok(_) | Err(gw2dat::Error::Unsupported(_)) => {}
@@ -137,6 +166,15 @@ fn decodes_a_sample_of_every_kind() {
         FileType::MapMetadata,
         FileType::Composite,
         FileType::Cinematic,
+        FileType::Bink2Video,
+        FileType::Flash,
+        FileType::ChromiumPak,
+        FileType::IcuData,
+        FileType::V8Snapshot,
+        FileType::Woff,
+        FileType::Eot,
+        FileType::Cteu,
+        FileType::Mp3,
     ] {
         assert!(seen.contains_key(&kind), "no {kind:?} found");
     }

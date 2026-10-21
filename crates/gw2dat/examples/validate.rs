@@ -8,7 +8,7 @@ use std::time::Instant;
 
 use gw2dat::formats::{
     animation, audio, audio_script, cinematic, collision, composite, content, emotes, font, image, manifests, map,
-    map_data, material, model, paged_image, sequences, stars, text, textpack, truetype,
+    map_data, material, media, model, paged_image, sequences, stars, text, textpack, truetype, web,
 };
 use gw2dat::{Archive, FileType, Index, Kind, ScanProgress};
 use rayon::prelude::*;
@@ -76,7 +76,22 @@ fn main() -> gw2dat::Result<()> {
                 Ok(a) => Err(format!("implausible header {a:?}")),
                 Err(err) => Err(err.to_string()),
             },
-            Kind::Font => truetype::info(&data).map(|_| ()).map_err(|e| e.to_string()),
+            // MicroType Express-compressed EOT fonts only have their header names read.
+            Kind::Font if truetype::is_compressed_eot(&data) => {
+                truetype::eot_info(&data).map(|_| ()).map_err(|e| e.to_string())
+            }
+            Kind::Font => {
+                truetype::to_sfnt(&data).and_then(|s| truetype::info(&s)).map(|_| ()).map_err(|e| e.to_string())
+            }
+            Kind::Video => media::bink(&data).map(|_| ()).map_err(|e| e.to_string()),
+            Kind::Flash => media::flash(&data).map(|_| ()).map_err(|e| e.to_string()),
+            Kind::ResourcePack => web::pak(&data)
+                .and_then(|p| {
+                    p.resources.iter().try_for_each(|r| web::decompress(&data[r.offset..r.offset + r.size]).map(|_| ()))
+                })
+                .map_err(|e| e.to_string()),
+            Kind::IcuData => web::icu(&data).map(|_| ()).map_err(|e| e.to_string()),
+            Kind::V8Snapshot => web::v8_snapshot(&data).map(|_| ()).map_err(|e| e.to_string()),
             Kind::StarField => stars::decode(&data).map(|_| ()).map_err(|e| e.to_string()),
             Kind::Sequences => sequences::decode(&data).map(|_| ()).map_err(|e| e.to_string()),
             // Only scene versions 35 and 36 are decoded.

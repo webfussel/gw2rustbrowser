@@ -275,7 +275,7 @@ impl Index {
 
 const CACHE_MAGIC: &[u8; 8] = b"GW2BIDX\0";
 /// Bump whenever file type detection or categorisation changes.
-const CACHE_VERSION: u32 = 23;
+const CACHE_VERSION: u32 = 24;
 
 impl Index {
     pub fn save(&self, path: &Path) -> io::Result<()> {

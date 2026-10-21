@@ -804,6 +804,9 @@ pub struct TrueTypeDto {
     version: String,
     glyphs: u16,
     characters: Vec<u32>,
+    /// EOT font compressed with MicroType Express: only the header names are
+    /// known and the font cannot be rendered.
+    compressed: bool,
 }
 
 #[tauri::command]
@@ -811,8 +814,15 @@ pub async fn truetype_info(app: AppHandle, mft: u32) -> CmdResult<TrueTypeDto> {
     blocking(move || {
         let session = session(&app.state::<AppState>())?;
         let data = session.read(mft).map_err(err)?;
-        let info = formats::truetype::info(&data).map_err(err)?;
+        let compressed = formats::truetype::is_compressed_eot(&data);
+        let info = if compressed {
+            formats::truetype::eot_info(&data)
+        } else {
+            formats::truetype::to_sfnt(&data).and_then(|sfnt| formats::truetype::info(&sfnt))
+        }
+        .map_err(err)?;
         Ok(TrueTypeDto {
+            compressed,
             family: info.family,
             subfamily: info.subfamily,
             full_name: info.full_name,
@@ -820,6 +830,18 @@ pub async fn truetype_info(app: AppHandle, mft: u32) -> CmdResult<TrueTypeDto> {
             glyphs: info.glyphs,
             characters: info.characters,
         })
+    })
+    .await
+}
+
+/// The font as plain TrueType/OpenType data (WOFF and EOT unpacked), for
+/// rendering it in the preview.
+#[tauri::command]
+pub async fn font_data(app: AppHandle, mft: u32) -> CmdResult<Response> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        let data = session.read(mft).map_err(err)?;
+        Ok(Response::new(formats::truetype::to_sfnt(&data).map_err(err)?.into_owned()))
     })
     .await
 }

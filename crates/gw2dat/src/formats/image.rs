@@ -52,7 +52,8 @@ pub fn decode(data: &[u8]) -> Result<RgbaImage> {
             || m == fcc(b"ATEC")
             || m == fcc(b"ATEP")
             || m == fcc(b"ATEU")
-            || m == fcc(b"ATET") =>
+            || m == fcc(b"ATET")
+            || m == fcc(b"CTEU") =>
         {
             decode_atex(data)
         }

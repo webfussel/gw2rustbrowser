@@ -42,6 +42,7 @@ file_types! {
     Atec => "ATEC", "atec", Image, ["Textures", "ATEC"];
     Atep => "ATEP", "atep", Image, ["Textures", "Map Textures"];
     Ateu => "ATEU", "ateu", Image, ["Textures", "UI Textures"];
+    Cteu => "CTEU", "cteu", Image, ["Textures", "CTEU"];
     Atet => "ATET", "atet", Image, ["Textures", "ATET"];
     Ctex => "CTEX", "ctex", Binary, ["Textures", "CTEX"];
     Dds => "DDS", "dds", Image, ["Textures", "DDS"];
@@ -103,7 +104,13 @@ file_types! {
 
     Strings => "strs", "strs", Strings, ["Texts", "Strings"];
     Font => "font", "ttf", Font, ["Fonts", "TrueType"];
-    Bink2Video => "Bink2", "bk2", Binary, ["Bink Videos"];
+    Woff => "WOFF", "woff", Font, ["Fonts", "WOFF"];
+    Eot => "EOT", "eot", Font, ["Fonts", "EOT"];
+    Bink2Video => "Bink2", "bk2", Video, ["Bink Videos"];
+    Flash => "SWF", "swf", Flash, ["Web browser", "Flash"];
+    ChromiumPak => "PAK", "pak", ResourcePack, ["Web browser", "Resource packs"];
+    IcuData => "ICU data", "dat", IcuData, ["Web browser", "ICU data"];
+    V8Snapshot => "V8 snapshot", "bin", V8Snapshot, ["Web browser", "V8 snapshots"];
     Arap => "ARAP", "arap", Binary, ["Misc"];
     Utf8Text => "UTF-8", "txt", Text, ["Texts", "Text"];
     Text => "text", "txt", Text, ["Texts", "Text"];
@@ -137,6 +144,16 @@ pub enum Kind {
     Composite,
     /// Cinematic scene: sequences, tracks, dialogue.
     Cinematic,
+    /// Bink video (header only: the codec is proprietary).
+    Video,
+    /// Flash movie (header only).
+    Flash,
+    /// Chromium resource pack of the in-game browser.
+    ResourcePack,
+    /// ICU (Unicode) data package of the in-game browser.
+    IcuData,
+    /// V8 JavaScript engine startup snapshot of the in-game browser.
+    V8Snapshot,
     Model,
     Animation,
     Strings,
@@ -169,7 +186,13 @@ impl FileType {
     pub fn is_texture(self) -> bool {
         matches!(
             self,
-            FileType::Atex | FileType::Attx | FileType::Atec | FileType::Atep | FileType::Ateu | FileType::Atet
+            FileType::Atex
+                | FileType::Attx
+                | FileType::Atec
+                | FileType::Atep
+                | FileType::Ateu
+                | FileType::Atet
+                | FileType::Cteu
         )
     }
 }
@@ -180,6 +203,8 @@ const SIGNATURES: &[(u32, FileType)] = &[
     (fcc(b"ATEC"), FileType::Atec),
     (fcc(b"ATEP"), FileType::Atep),
     (fcc(b"ATEU"), FileType::Ateu),
+    (fcc(b"CTEU"), FileType::Cteu),
+    (fcc(b"wOFF"), FileType::Woff),
     (fcc(b"ATET"), FileType::Atet),
     (fcc(b"CTEX"), FileType::Ctex),
     (fcc(b"DDS "), FileType::Dds),
@@ -243,7 +268,8 @@ pub fn identify(data: &[u8], complete: bool) -> Identified {
     let need = |size: usize, fallback: FileType| if complete { Type(fallback) } else { NeedMore(size) };
 
     let Some(magic) = u32_at(data, 0) else {
-        return Type(FileType::Unknown);
+        // Files of under four bytes: text if they are text.
+        return Type(if !data.is_empty() && is_text(data) { FileType::Text } else { FileType::Unknown });
     };
     if let Some(&(_, file_type)) = SIGNATURES.iter().find(|(m, _)| *m == magic) {
         return Type(file_type);
@@ -298,16 +324,81 @@ pub fn identify(data: &[u8], complete: bool) -> Identified {
         };
     }
 
+    // Chromium resource pack (version 5): the first resource starts right
+    // after the header, the entry table and the alias table.
+    if magic == 5 && u32_at(data, 4).is_some_and(|encoding| encoding <= 2) {
+        let u16_at = |at: usize| data.get(at..at + 2).map(|b| u16::from_le_bytes([b[0], b[1]]) as usize);
+        match (u16_at(8), u16_at(10), u32_at(data, 14)) {
+            (Some(resources), Some(aliases), Some(first)) if resources > 0 => {
+                if first as usize == 12 + (resources + 1) * 6 + aliases * 4 {
+                    return Type(FileType::ChromiumPak);
+                }
+            }
+            (Some(_), Some(_), None) | (None, _, _) | (_, None, _) => return need(18, FileType::Unknown),
+            _ => {}
+        }
+    }
+    // V8 startup snapshot: context count, rehashability flag, checksum, then
+    // the V8 version string (e.g. `10.3.174.18`).
+    if magic < 64 && u32_at(data, 4).is_some_and(|flag| flag <= 1) {
+        if let Some(version) = data.get(12..76) {
+            let end = version.iter().position(|&b| b == 0).unwrap_or(0);
+            let text = &version[..end];
+            if end >= 5
+                && text.iter().all(|b| b.is_ascii_digit() || *b == b'.')
+                && text.iter().filter(|&&b| b == b'.').count() == 3
+            {
+                return Type(FileType::V8Snapshot);
+            }
+        } else if !complete {
+            return NeedMore(76);
+        }
+    }
+    // ICU data package: `0xDA27` after the header size, format `CmnD`.
+    if data.get(2..4) == Some(&[0xda, 0x27]) && data.get(12..16) == Some(b"CmnD") {
+        return Type(FileType::IcuData);
+    }
+    // Embedded OpenType font: known version and the `LP` magic at 34.
+    if matches!(u32_at(data, 8), Some(0x0001_0000 | 0x0002_0001 | 0x0002_0002)) {
+        match data.get(34..36) {
+            Some([0x4c, 0x50]) => return Type(FileType::Eot),
+            None => return need(36, FileType::Unknown),
+            _ => {}
+        }
+    }
+
     match magic & 0xff_ffff {
-        0x32_4b42 => return Type(FileType::Bink2Video), // "BK2"
+        0x32_424b => return Type(FileType::Bink2Video), // "KB2" + revision letter
+        0x53_5743 | 0x53_5746 | 0x53_575a => return Type(FileType::Flash), // "CWS", "FWS", "ZWS"
         0x33_4449 => return Type(FileType::Mp3),        // "ID3"
         0xff_d8ff => return Type(FileType::Jpeg),
         0xbf_bbef => return Type(FileType::Utf8Text), // UTF-8 BOM
         _ => {}
     }
 
-    let is_text = data.iter().all(|&c| c.is_ascii_graphic() || matches!(c, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c));
-    Type(if is_text { FileType::Text } else { FileType::Unknown })
+    if is_mpeg_audio_frame(data) {
+        return Type(FileType::Mp3);
+    }
+    Type(if is_text(data) { FileType::Text } else { FileType::Unknown })
+}
+
+/// An MPEG audio frame header (MP3 without ID3 tag): sync bits and valid
+/// version, layer, bitrate and sample rate fields.
+fn is_mpeg_audio_frame(data: &[u8]) -> bool {
+    let [0xff, b1, b2, ..] = *data else { return false };
+    b1 & 0xe0 == 0xe0 && (b1 >> 3) & 3 != 1 && (b1 >> 1) & 3 != 0 && !matches!(b2 >> 4, 0 | 15) && (b2 >> 2) & 3 != 3
+}
+
+/// Printable text: ASCII or UTF-8 (a character cut off at the end of `data`
+/// is allowed, since only the start of a file is checked).
+fn is_text(data: &[u8]) -> bool {
+    let valid = match std::str::from_utf8(data) {
+        Ok(text) => text,
+        Err(e) if e.error_len().is_none() => std::str::from_utf8(&data[..e.valid_up_to()]).unwrap(),
+        Err(_) => return false,
+    };
+    !valid.is_empty()
+        && valid.chars().all(|c| !c.is_control() || matches!(c, ' ' | '\t' | '\n' | '\r' | '\u{0b}' | '\u{0c}'))
 }
 
 /// Refines a type using the decompressed file size: model files consisting of
@@ -564,6 +655,11 @@ mod tests {
         assert_eq!(identified(b"\xff\xd8\xff\xe0rest"), FileType::Jpeg);
         assert_eq!(identified(b"RIFF\0\0\0\0WEBPVP8 "), FileType::Webp);
         assert_eq!(identified(b"plain text\n"), FileType::Text);
+        assert_eq!(identified(b"\r\n"), FileType::Text);
+        assert_eq!(identified("caf\u{e9} \u{2014} \u{8bed}".as_bytes()), FileType::Text);
+        assert_eq!(identified(&[0xff, 0xfb, 0x54, 0x64, 0, 0]), FileType::Mp3);
+        assert_eq!(identified(b"KB2i\0\0\0\0"), FileType::Bink2Video);
+        assert_eq!(identified(b"CWS\x0e\0\0\0\0"), FileType::Flash);
     }
 
     #[test]

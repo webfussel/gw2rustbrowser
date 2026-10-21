@@ -15,6 +15,7 @@ pub mod manifests;
 pub mod map;
 pub mod map_data;
 pub mod material;
+pub mod media;
 pub mod model;
 pub mod paged_image;
 pub mod pf;
@@ -25,6 +26,7 @@ pub mod stars;
 pub mod text;
 pub mod textpack;
 pub mod truetype;
+pub mod web;
 
 use crate::error::{Error, Result};
 use crate::filetype::{FileType, Kind};
@@ -58,7 +60,7 @@ pub fn convert(file_type: FileType, data: Vec<u8>) -> Result<Converted> {
         }
         Kind::Text => Converted { data, extension: "txt" },
         Kind::Content => Converted { data: content::to_xml(&data)?.into_bytes(), extension: "xml" },
-        Kind::Font => Converted { data, extension: "ttf" },
+        Kind::Font => Converted { data: truetype::to_sfnt(&data)?.into_owned(), extension: "ttf" },
         Kind::Sequences => {
             Converted { data: sequences::to_json(&sequences::decode(&data)?).into_bytes(), extension: "json" }
         }

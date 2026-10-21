@@ -15,6 +15,7 @@ mod rig;
 mod session;
 mod settings;
 mod texts;
+mod web_view;
 
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, RwLock};
@@ -74,6 +75,13 @@ pub fn run() {
             commands::model_clip,
             commands::font_atlas,
             commands::truetype_info,
+            commands::font_data,
+            web_view::bink_info,
+            web_view::flash_info,
+            web_view::pak_info,
+            web_view::pak_resource,
+            web_view::icu_info,
+            web_view::v8_info,
             commands::load_stars,
             map_view::load_map,
             map_view::load_prop_model,

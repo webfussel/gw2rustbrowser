@@ -2,7 +2,8 @@
   import { api } from "../api";
   import { errorMessage } from "../format";
 
-  let { mft }: { mft: number } = $props();
+  /** `load`: where the bytes come from, instead of the archive file `mft`. */
+  let { mft = 0, load = null }: { mft?: number; load?: (() => Promise<Uint8Array>) | null } = $props();
 
   const ROW = 20;
   const WIDTH = 16;
@@ -14,8 +15,7 @@
 
   $effect(() => {
     let stale = false;
-    api
-      .readFile(mft)
+    (load ?? (() => api.readFile(mft)))()
       .then((b) => !stale && (bytes = b))
       .catch((e) => !stale && (error = errorMessage(e)));
     return () => (stale = true);

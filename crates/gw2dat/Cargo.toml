@@ -6,6 +6,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+brotli-decompressor = "6"
+flate2 = "1"
 rayon = "1"
 thiserror = "2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }

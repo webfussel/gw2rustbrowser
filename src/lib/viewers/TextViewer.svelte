@@ -3,8 +3,15 @@
   import { errorMessage } from "../format";
   import { highlight } from "../highlight";
 
-  /** `language`: highlight.js language for syntax highlighting, if any. */
-  let { mft, language = null }: { mft: number; language?: string | null } = $props();
+  /**
+   * `language`: highlight.js language for syntax highlighting, if any.
+   * `load`: where the text comes from, instead of the archive file `mft`.
+   */
+  let {
+    mft = 0,
+    language = null,
+    load = null,
+  }: { mft?: number; language?: string | null; load?: (() => Promise<string>) | null } = $props();
 
   const LIMIT = 4 * 1024 * 1024;
   // Larger files stay plain: highlighting them would freeze the view.
@@ -18,8 +25,7 @@
 
   $effect(() => {
     let stale = false;
-    api
-      .loadText(mft)
+    (load ?? (() => api.loadText(mft)))()
       .then((full) => {
         if (stale) return;
         truncated = full.length > LIMIT;

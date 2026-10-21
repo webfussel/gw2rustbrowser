@@ -149,6 +149,110 @@ fn read_cmap(table: &[u8]) -> Result<Vec<u32>> {
     Ok(characters)
 }
 
+/// The plain TrueType/OpenType (sfnt) data of a font file: TrueType as is,
+/// WOFF unpacked, EOT (Embedded OpenType) with its header removed.
+pub fn to_sfnt(data: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>> {
+    use std::borrow::Cow;
+    if data.starts_with(b"wOFF") {
+        return woff_to_sfnt(data).map(Cow::Owned);
+    }
+    if data.len() >= 36 && data[34..36] == [0x4c, 0x50] {
+        let u32_le = |at: usize| u32::from_le_bytes(data[at..at + 4].try_into().unwrap()) as usize;
+        let (total, font, flags) = (u32_le(0), u32_le(4), u32_le(12));
+        if flags & 0x4 != 0 {
+            return Err(Error::Unsupported("EOT font with MicroType Express compression".into()));
+        }
+        let start = total.checked_sub(font).ok_or(Error::Truncated)?;
+        let body = data.get(start..total).ok_or(Error::Truncated)?;
+        // TTEMBED_XORENCRYPTDATA: every byte XORed with 0x50.
+        return Ok(if flags & 0x1000_0000 != 0 {
+            Cow::Owned(body.iter().map(|b| b ^ 0x50).collect())
+        } else {
+            Cow::Borrowed(body)
+        });
+    }
+    Ok(Cow::Borrowed(data))
+}
+
+fn woff_to_sfnt(data: &[u8]) -> Result<Vec<u8>> {
+    use std::io::Read;
+    let r = Reader(data);
+    let flavor = r.u32(4)?;
+    let tables = r.u16(12)? as usize;
+    let mut entries = Vec::with_capacity(tables);
+    for i in 0..tables {
+        let at = 44 + i * 20;
+        let tag = data.get(at..at + 4).ok_or(Error::Truncated)?.to_vec();
+        let (offset, compressed, original, checksum) =
+            (r.u32(at + 4)? as usize, r.u32(at + 8)? as usize, r.u32(at + 12)? as usize, r.u32(at + 16)?);
+        let stored = data.get(offset..offset + compressed).ok_or(Error::Truncated)?;
+        let table = if compressed < original {
+            let mut out = Vec::with_capacity(original);
+            flate2::read::ZlibDecoder::new(stored)
+                .read_to_end(&mut out)
+                .map_err(|e| Error::format("WOFF", e.to_string()))?;
+            out
+        } else {
+            stored.to_vec()
+        };
+        entries.push((tag, checksum, table));
+    }
+    // sfnt offset table, table records, then 4-byte aligned tables.
+    let mut power = 1;
+    let mut selector = 0u16;
+    while power * 2 <= tables {
+        power *= 2;
+        selector += 1;
+    }
+    let mut out = Vec::new();
+    out.extend_from_slice(&flavor.to_be_bytes());
+    out.extend_from_slice(&(tables as u16).to_be_bytes());
+    out.extend_from_slice(&((power * 16) as u16).to_be_bytes());
+    out.extend_from_slice(&selector.to_be_bytes());
+    out.extend_from_slice(&((tables * 16 - power * 16) as u16).to_be_bytes());
+    let mut offset = 12 + tables * 16;
+    for (tag, checksum, table) in &entries {
+        out.extend_from_slice(tag);
+        out.extend_from_slice(&checksum.to_be_bytes());
+        out.extend_from_slice(&(offset as u32).to_be_bytes());
+        out.extend_from_slice(&(table.len() as u32).to_be_bytes());
+        offset += table.len().next_multiple_of(4);
+    }
+    for (_, _, table) in &entries {
+        out.extend_from_slice(table);
+        out.resize(out.len().next_multiple_of(4), 0);
+    }
+    Ok(out)
+}
+
+/// Names stored in an EOT (Embedded OpenType) header, readable even when the
+/// font data itself is compressed with MicroType Express.
+pub fn eot_info(data: &[u8]) -> Result<FontInfo> {
+    if data.get(34..36) != Some(&[0x4c, 0x50]) {
+        return Err(Error::format("EOT font", "missing magic number"));
+    }
+    let u16_le =
+        |at: usize| data.get(at..at + 2).map(|b| u16::from_le_bytes([b[0], b[1]]) as usize).ok_or(Error::Truncated);
+    // Padding, size and UTF-16LE string; family, style, version, full name.
+    let mut at = 80;
+    let mut names = Vec::with_capacity(4);
+    for _ in 0..4 {
+        let size = u16_le(at + 2)?;
+        let bytes = data.get(at + 4..at + 4 + size).ok_or(Error::Truncated)?;
+        let units: Vec<u16> = bytes.as_chunks::<2>().0.iter().map(|b| u16::from_le_bytes(*b)).collect();
+        names.push(String::from_utf16_lossy(&units).trim_end_matches('\0').to_owned());
+        at += 4 + size;
+    }
+    let [family, subfamily, version, full_name] = names.try_into().unwrap();
+    Ok(FontInfo { family, subfamily, full_name, version, ..FontInfo::default() })
+}
+
+/// Whether an EOT font's data is compressed with MicroType Express, which is
+/// not decoded.
+pub fn is_compressed_eot(data: &[u8]) -> bool {
+    data.get(34..36) == Some(&[0x4c, 0x50]) && data.get(12..16).is_some_and(|f| f[0] & 0x4 != 0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -156,5 +260,25 @@ mod tests {
     #[test]
     fn rejects_non_fonts() {
         assert!(info(b"OggS....").is_err());
+    }
+
+    #[test]
+    fn eot_header_names() {
+        let mut data = vec![0u8; 80];
+        data[12] = 0x4;
+        data[34..36].copy_from_slice(b"LP");
+        for name in ["Fam", "Bold", "1.0", "Fam Bold"] {
+            let units: Vec<u8> = name.encode_utf16().flat_map(u16::to_le_bytes).collect();
+            data.extend_from_slice(&[0, 0]);
+            data.extend_from_slice(&(units.len() as u16).to_le_bytes());
+            data.extend_from_slice(&units);
+        }
+        let info = eot_info(&data).unwrap();
+        assert_eq!(
+            (info.family.as_str(), info.subfamily.as_str(), info.full_name.as_str()),
+            ("Fam", "Bold", "Fam Bold")
+        );
+        assert!(is_compressed_eot(&data));
+        assert!(to_sfnt(&data).is_err());
     }
 }
