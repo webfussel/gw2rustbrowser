@@ -1,5 +1,35 @@
 # GW2 Browser (Rust)
 
+## Prologue
+
+Everything this project can do, it can do because of the original projects.
+**Absolutely nothing here, 0%, would have been possible without the incredible
+work of the original creators.** Their authors reverse-engineered the `Gw2.dat` archive, its compression and
+its file formats by hand, at a time when none of it was documented anywhere.
+That work is the hard part, it is brilliant, and it was shared with everyone
+for free. This repository only stands on their shoulders.
+
+**The original projects:**
+
+| Project | What it is | Repository |
+|---|---|---|
+| **Gw2Browser** | Browser for the contents of `Gw2.dat`, the application this port is based on (Rhoot, Khralkatorrix and others; maintained fork by kytulendu) | [rhoot/Gw2Browser](https://github.com/rhoot/Gw2Browser), fork: [kytulendu/gw2browser](https://github.com/kytulendu/gw2browser) |
+| **gw2DatTools** | Reading and decompressing the `.dat` archive and its textures (Antoine Hom) | [ahom/gw2_reverse](https://github.com/ahom/gw2_reverse), fork: [kytulendu/gw2dattools](https://github.com/kytulendu/gw2dattools) |
+| **gw2formats** | Type-safe descriptions of the game's file formats (Rhoot, Khralkatorrix) | [rhoot/gw2formats](https://github.com/rhoot/gw2formats), fork: [kytulendu/gw2formats](https://github.com/kytulendu/gw2formats) |
+
+And yes: checking out somebody else's carefully built C++ source and going
+"let's rewrite it in Rust" felt incredibly dirty. It is about the most
+stereotypical thing one can do with someone else's project, and I am fully
+aware of it.
+
+**If you want to support anything here, support the original projects** —
+star them, contribute to them, credit them. Not this vibe-coded slop. And
+yes, that includes the text you are reading right now: **even this README was
+generated.**
+
+In the end, I just wanted to provide a fast and stable tool to the community,
+so that maybe more people can do datamining and it becomes more popular.
+
 Rust port of [Gw2Browser](https://github.com/kytulendu/gw2browser): opens the
 `Gw2.dat` of Guild Wars 2, shows its contents and exports them.
 
@@ -24,8 +54,10 @@ the window.
 ### Portable Windows build
 
 The app needs no installer: the release executable contains the whole
-frontend, and the Visual C++ runtime is linked in statically
-(`.cargo/config.toml`). Build only the executable, on Windows:
+frontend, and Tauri links the Visual C++ runtime in statically (the Universal
+CRT it uses is part of Windows). Do not add `-C target-feature=+crt-static`:
+it conflicts with Tauri's static runtime and the link fails with undefined
+C functions (`strlen`, `pow`, …). Build only the executable, on Windows:
 
 ```bash
 npx tauri build --no-bundle
@@ -41,7 +73,7 @@ npx tauri build --no-bundle --runner cargo-xwin --target x86_64-pc-windows-msvc
 Zip `gw2browser.exe` (from `target/release/` or
 `target/x86_64-pc-windows-msvc/release/`); it runs on Windows 10 and 11, which
 ship the WebView2 runtime. Settings, index caches and the web view's data are
-kept in a `data` folder next to the executable, so deleting the unpacked folder
+kept in a `data` folder next to the executable (on every platform), so deleting the unpacked folder
 removes everything. Only when that folder cannot be written does the app use
 the per-user folders (`%APPDATA%`/`%LOCALAPPDATA%`, `~/.config`/`~/.cache`).
 
@@ -62,7 +94,7 @@ the per-user folders (`%APPDATA%`/`%LOCALAPPDATA%`, `~/.config`/`~/.cache`).
 | Game content (cntc) | XML with syntax highlighting | XML |
 | Bitmap fonts (AFNT) | Glyph atlas per font and character range | PNG per font and range |
 | Glyph files of bitmap fonts | Glyph atlas with character range and the fonts using it | PNG |
-| Fonts: TrueType (10 files), WOFF and EOT (1 each, under Fonts) | Specimen in the font itself: sample text in several sizes, every mapped character; WOFF is unpacked to TrueType; the EOT font is compressed with MicroType Express, so only the names from its header are shown | TTF (TrueType and WOFF; EOT raw) |
+| Fonts: TrueType (10 files), WOFF and EOT (1 each, under Fonts) | Specimen in the font itself: sample text in several sizes, every mapped character; WOFF is unpacked to TrueType; the EOT font is compressed with MicroType Express, so only the names from its header are shown | TTF (TrueType and WOFF; EOT only raw) |
 | Star fields (STAR, 2 files) | Sky chart (dome or panorama), stars sized by brightness, colouring by the unknown values, values on hover | CSV |
 | Animation sequences (anic) | Searchable table of 1,853 sequences / 8,858 variants: steps, movement, blend times, timeline with triggers, charge stages | JSON |
 | Emote animations (emoc, 1 file, 314 emotes) | Searchable emote list; per emote its variants (one per body type, mount or prop) with the animation file (jump to it), intro/loop/outro timeline, blend times, start offset; the selected variant's model in 3D or its summary | CSV |
@@ -72,12 +104,12 @@ the per-user folders (`%APPDATA%`/`%LOCALAPPDATA%`, `~/.config`/`~/.cache`).
 | Map shadows (mpsd, 279 files) | Shadow map image with tile counts and sun position; detailed tiles are shown at the middle of their value range (their per-pixel encoding is not decoded) | PNG |
 | Map metadata (mMet, 1 file) | All 1,244 map ids with their map type, filterable | CSV |
 | Character composition (cmpc, 1 file) | Per race and sex (29): skeleton, colour palettes, body shapes, faces, hair styles, beards, ears, skin patterns, animation overrides; every body and armour part with mesh, texture, normal map and dye masks (mesh in 3D and texture side by side); NPC preset variants with their parts and colour adjustments; armour texture atlas layouts | raw |
-| Cinematics (CINP, 1,457 files; scene versions 35 and 36, 938 files, are decoded) | Timeline per sequence with a row per track group (camera, model, image, text, audio, light, filter, …) and its keys and triggers; track curves of a selected group; the scene's dialogue (English subtitles) with playable voice lines; files, scripts, ambient lights, species | TXT (dialogue) |
+| Cinematics (CINP, 1,457 files; scene versions 35 and 36, 938 files, are decoded) | Timeline per sequence with a row per track group (camera, model, image, text, audio, light, filter, …) and its keys and triggers; track curves of a selected group; the scene's dialogue (English subtitles) with playable voice lines; files, scripts, ambient lights, species | TXT (sequences and dialogue; older versions raw) |
 | Maps (mapc, 287 files) | 3D view: terrain heightmap coloured by height and slope, sea level and lakes, props as textured models (loaded within a draw distance around the focus point with markers for the rest, or all at once); click a prop for its model id; size, prop and chunk overview | 16-bit heightmap PNG |
 | Materials (AMAT, 2,854 files) | Texture slots, techniques with their passes and effects (render state decoded: blending, depth, culling), sampler states; per shader: uniforms with registers, input/output signatures, vertex attributes, texture bindings and a shader model 5 disassembly annotated with uniform names | TXT (everything incl. disassembly) |
 | World map tiles (PIMG, 3,298 files, under Maps) | Pan and zoom like a map: an overview of the whole layer, sharper pages load as you zoom in (up to the full 512×512 per page); layers, page and texture under the cursor | PNG of a layer at a chosen pixels-per-page |
 | TextPack (txtm manifest, txtV variants, txtv voices) | Every game text by ID and language, full-text search, jump to ID; text variants side by side; voice lines with playback from the sound banks (only playable by default) | raw |
-| Text files (2,688, sorted by content: HTML, JavaScript, CSS, JSON, XML, PHP, ActionScript, licenses, documentation, plain text; mostly the YUI 3 web library the game ships for its web UI) | Text view with syntax highlighting (HTML/XML with embedded JS and CSS, JavaScript, CSS, JSON, PHP, Markdown, ActionScript; files up to 1 MiB) | raw |
+| Text files (2,696, sorted by content: HTML, JavaScript, documentation, CSS, JSON, plain text, PHP, XML, licenses, ActionScript; mostly the YUI 3 web library the game ships for its web UI) | Text view with syntax highlighting (HTML/XML with embedded JS and CSS, JavaScript, CSS, JSON, PHP, Markdown, ActionScript; highlighting for files up to 1 MiB, the first 4 million characters are shown) | raw |
 | Bink 2 videos (KB2, 153 files) | Resolution, frame rate, frame count, duration, audio tracks, bit rate. **Not playable**: Bink 2 is RAD Game Tools' proprietary codec without an open decoder, so the preview says so and points to RAD Video Tools | raw (`.bk2`) |
 | Web browser: resource packs (Chromium `.pak` v5, 4 files) | Every resource by id and content kind (PNG/WebP/SVG images, HTML, JavaScript, CSS, JSON, text, fonts); gzip and Chromium's brotli compression are unpacked; images, highlighted text or hex per resource | raw |
 | Web browser: ICU data (`icudt71l`, 1 file) | Copyright, versions, the 2,124 entries grouped by tree (locales, collation, break rules, …) with sizes | raw |
@@ -112,9 +144,10 @@ chunk headers is read while scanning):
 Search: file ID (base or file ID, also by prefix), `#<MFT index>`, or part of
 an asset name or path. The 9,188 models with collision and their collision files
 show their original asset name from development (e.g. `Crab.amdl2`, read from
-the model collision manifest); exports of them are named `<asset>_<id>.<ext>`.
-Shortcuts: `Ctrl+O` open, `Ctrl+F` search, arrow keys/PageUp/PageDown in the
-file list.
+the model collision manifest); when one of them is exported on its own, the
+suggested file name is `<asset>_<id>.<ext>`.
+Shortcuts: `Ctrl+O` open, `Ctrl+F` search, arrow keys/PageUp/PageDown/Home/End
+in the file list.
 
 ## Differences from the original
 
@@ -127,7 +160,7 @@ file list.
   thread. 818,000 files: ~0.5 s with a warm page cache, about a minute cold
   over NTFS/FUSE.
 - **Incremental index cache**: after a game patch only changed MFT entries are
-  scanned again. Loading the cache takes ~30 ms.
+  scanned again. Loading the cache takes ~40 ms.
 - ID lookup via hash map (the original searches linearly and freezes).
 
 ### Bugs fixed (verified against a real `Gw2.dat`)
@@ -151,8 +184,8 @@ file list.
   selection are fixed.
 - Model files without geometry (the original reports "no data"/crashes) are
   recognised as what they are: Granny animation clips. They have their own
-  category "Models / Animations" with name, duration and frame rate.
-- Animations: Granny 3D clips are decoded (all 13 curve formats in use,
+  category "Models / Animation / Animations" with name, duration and frame rate.
+- Animations: Granny 3D clips are decoded (all 18 curve formats in use,
   including compressed quaternions) and played on the model's skeleton with
   skinning. Mesh bones are matched to skeleton bones by their name tokens.
 - Bitmap fonts: all 13 character ranges instead of Basic Latin only; glyph files
@@ -162,9 +195,9 @@ file list.
   solid colours (stored as BGRA) on a grid; the world map has 80×112 pages
   (40,960×57,344 pixels).
 - Audio scripts: the original listed them only. gw2formats describes chunk
-  version 30; version 33 (all but eight files) adds one dword after
-  `channelMax` in each meta sound. All 133,000 meta sounds decode and all
-  568,603 sound file references resolve.
+  version 30; version 33 (all but eight files, which use versions 28–30) adds
+  one dword after `channelMax` in each meta sound. All 133,129 meta sounds
+  decode and all 568,894 sound file references resolve.
 - Materials: the original listed them only. The `BGFX` chunk holds
   [bgfx](https://github.com/bkaradzic/bgfx) shader binaries (GW2's DirectX 11
   renderer is built on bgfx) wrapping DXBC bytecode; gw2formats only describes
@@ -185,7 +218,7 @@ crates/gw2dat/            core library
   src/inflate/            Huffman/LZ decompression (.dat) and texture decompression
   src/filetype.rs         type detection and categories (table-driven)
   src/index.rs            parallel scan, incremental cache
-  src/formats/            pf (PF container), image, audio, audio_script, cinematic, collision, composite, emotes, manifests, model, map, map_data, material, paged_image, shader, text, font, truetype (TrueType, WOFF, EOT), content, media (Bink 2, SWF headers), web (Chromium PAK, ICU, V8)
+  src/formats/            pf (PF container), image, audio, audio_script, cinematic, collision, composite, emotes, manifests, model, skeleton, animation, granny (Granny clips), sequences, map, map_data, material, paged_image, shader, stars, text, textpack, font, truetype (TrueType, WOFF, EOT), content, media (Bink 2, SWF headers), web (Chromium PAK, ICU, V8)
   examples/               developer tools (see below)
   tests/real_archive.rs   tests against a real Gw2.dat
 src-tauri/                Tauri backend (commands, export)
@@ -203,7 +236,8 @@ cargo run --release -p gw2dat --example render -- res/Gw2.dat <outdir> <model id
 ```
 
 `validate` is the quickest check after a game update: at the time of writing,
-778,936 files decode with 0 errors.
+818,082 files pass with 0 errors (text and glyph files are only counted, plain
+binaries skipped).
 
 ### Tests
 
