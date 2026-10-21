@@ -1,7 +1,9 @@
+mod audio_script_view;
 mod commands;
 mod export;
 mod font_export;
 mod map_view;
+mod material_view;
 mod model_export;
 mod rig;
 mod session;
@@ -35,6 +37,8 @@ pub fn run() {
             commands::load_image,
             commands::load_sound,
             commands::load_bank,
+            commands::load_bank_index,
+            audio_script_view::audio_script_info,
             commands::load_bank_sound,
             commands::load_strings,
             commands::load_eula,
@@ -52,6 +56,8 @@ pub fn run() {
             commands::load_stars,
             map_view::load_map,
             map_view::load_prop_model,
+            material_view::material_info,
+            material_view::material_shader,
             commands::load_sequences,
             commands::textpack_info,
             commands::text_rows,

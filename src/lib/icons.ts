@@ -143,6 +143,8 @@ const byKind: Record<string, IconSpec> = {
   image: spec(Image, "image", "Images"),
   sound: spec(AudioLines, "sound", "Sounds"),
   soundbank: spec(Library, "sound", "Sound banks"),
+  soundbankindex: spec(ListMusic, "sound", "Sound bank indexes"),
+  audioscript: spec(ScrollText, "sound", "Audio scripts"),
   model: spec(Box, "model", "Models"),
   animation: spec(PersonStanding, "animation", "Animations"),
   strings: spec(Languages, "text", "Strings"),
@@ -156,6 +158,7 @@ const byKind: Record<string, IconSpec> = {
   sequences: spec(ListVideo, "animation", "Animation sequences"),
   textpack: spec(Languages, "text", "Text packs"),
   map: spec(Map, "map", "Maps"),
+  material: spec(Palette, "code", "Materials"),
   binary: spec(Binary, "code", "Binary data"),
 };
 

@@ -166,3 +166,44 @@ pub fn bank_voices(data: &[u8]) -> Result<Vec<(u32, usize, bool)>> {
 }
 
 pub const ASND_MAGIC: u32 = fcc(b"asnd");
+
+pub const ABIX: u32 = fcc(b"ABIX");
+const BIDX: u32 = fcc(b"BIDX");
+
+/// A sound bank index (PF `ABIX`): per language slot, the bank file of each
+/// bank number. Slots follow the game's language codes (see
+/// [`super::text::language_name`]); voiced languages have banks, the others
+/// are empty.
+#[derive(Clone, Debug)]
+pub struct BankIndex {
+    /// Per language slot: bank file id per bank number.
+    pub languages: Vec<Vec<Option<u32>>>,
+}
+
+pub fn decode_bank_index(data: &[u8]) -> Result<BankIndex> {
+    let file = PackFile::parse(data)?;
+    if file.file_type != ABIX {
+        return Err(Error::format("sound bank index", "not an ABIX file"));
+    }
+    let mut c = file.require_chunk(BIDX)?.cursor();
+    let (count, mut language) = c.array()?;
+    let mut languages = Vec::with_capacity(count.min(64));
+    for _ in 0..count {
+        let (banks, mut file) = language.array()?;
+        languages.push((0..banks).map(|_| file.file_ref()).collect::<Result<_>>()?);
+    }
+    Ok(BankIndex { languages })
+}
+
+/// `bank,language,file id` rows with a header.
+pub fn bank_index_to_csv(index: &BankIndex) -> String {
+    let mut out = String::from("bank,language,file_id\n");
+    for (language, banks) in index.languages.iter().enumerate() {
+        for (bank, file) in banks.iter().enumerate() {
+            if let Some(id) = file {
+                out.push_str(&format!("{bank},{},{id}\n", super::text::language_name(language as u8)));
+            }
+        }
+    }
+    out
+}

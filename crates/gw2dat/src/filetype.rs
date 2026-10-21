@@ -64,9 +64,9 @@ file_types! {
     TextPackManifest => "txtm", "txtm", TextPack, ["Manifests", "TextPack"];
     TextPackVariant => "txtV", "txtv", TextPack, ["TextPack", "Variant"];
     TextPackVoices => "txtv", "txtvoice", TextPack, ["TextPack", "Voices"];
-    Bank => "ABNK", "abnk", SoundBank, ["Soundbank"];
-    BankIndex => "ABIX", "abix", Binary, ["Soundbank Index"];
-    AudioScript => "AMSP", "amsp", Binary, ["Audio Scripts"];
+    Bank => "ABNK", "abnk", SoundBank, ["Sounds", "Soundbanks"];
+    BankIndex => "ABIX", "abix", SoundBankIndex, ["Sounds", "Soundbank indexes"];
+    AudioScript => "AMSP", "amsp", AudioScript, ["Sounds", "Audio scripts"];
     Model => "MODL", "modl", Model, ["Models", "Other"];
     ModelAnimated => "MODL animated", "modl", Model, ["Models", "Models with animation"];
     ModelStatic => "MODL static", "modl", Model, ["Models", "Models without animation"];
@@ -87,7 +87,7 @@ file_types! {
     MapShadow => "mpsd", "mpsd", Binary, ["Maps", "Shadows"];
     MapMetadata => "mMet", "mmet", Binary, ["Maps", "Metadata"];
     PagedImageTable => "PIMG", "pimg", Binary, ["Paged Image Table"];
-    Material => "AMAT", "amat", Binary, ["Materials"];
+    Material => "AMAT", "amat", Material, ["Materials"];
     Composite => "cmpc", "cmpc", Binary, ["Composite Data"];
     Cinematic => "CINP", "cinp", Binary, ["Cinematics"];
     AnimSequences => "anic", "anic", Sequences, ["Animation Sequences"];
@@ -115,6 +115,10 @@ pub enum Kind {
     Image,
     Sound,
     SoundBank,
+    /// Which sound bank holds each bank number, per language.
+    SoundBankIndex,
+    /// Sound events, triggers and (in one file) the music playlists.
+    AudioScript,
     Model,
     Animation,
     Strings,
@@ -134,6 +138,8 @@ pub enum Kind {
     TextPack,
     /// Terrain, props and water of a map.
     Map,
+    /// Compiled material: settings, techniques and shaders.
+    Material,
     Binary,
 }
 

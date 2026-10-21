@@ -7,6 +7,8 @@
   import TextViewer from "./viewers/TextViewer.svelte";
   import SoundPlayer from "./viewers/SoundPlayer.svelte";
   import SoundBankViewer from "./viewers/SoundBankViewer.svelte";
+  import BankIndexViewer from "./viewers/BankIndexViewer.svelte";
+  import AudioScriptViewer from "./viewers/AudioScriptViewer.svelte";
   import StringsViewer from "./viewers/StringsViewer.svelte";
   import EulaViewer from "./viewers/EulaViewer.svelte";
   import FontViewer from "./viewers/FontViewer.svelte";
@@ -16,6 +18,7 @@
   import TrueTypeViewer from "./viewers/TrueTypeViewer.svelte";
   import GlyphFileViewer from "./viewers/GlyphFileViewer.svelte";
   import StarFieldViewer from "./viewers/StarFieldViewer.svelte";
+  import MaterialViewer from "./viewers/MaterialViewer.svelte";
   import SequenceViewer from "./viewers/SequenceViewer.svelte";
   import TextPackViewer from "./viewers/TextPackViewer.svelte";
 
@@ -37,6 +40,8 @@
     "content",
     "sound",
     "soundbank",
+    "soundbankindex",
+    "audioscript",
     "strings",
     "eula",
     "model",
@@ -48,6 +53,7 @@
     "sequences",
     "textpack",
     "map",
+    "material",
   ];
   const hasPreview = $derived(detail !== null && previewKinds.includes(detail.kind));
   const activeTab = $derived<Tab>(hasPreview ? tab : "hex");
@@ -131,6 +137,10 @@
         <TextViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "sound"}
         <SoundPlayer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "audioscript"}
+        <AudioScriptViewer mft={d.mft} />
+      {:else if activeTab === "preview" && d.kind === "soundbankindex"}
+        <BankIndexViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "soundbank"}
         <SoundBankViewer mft={d.mft} name={displayName(d)} />
       {:else if activeTab === "preview" && d.kind === "strings"}
@@ -151,6 +161,8 @@
         {#await mapViewer() then { default: MapViewer }}
           <MapViewer mft={d.mft} />
         {/await}
+      {:else if activeTab === "preview" && d.kind === "material"}
+        <MaterialViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "starfield"}
         <StarFieldViewer mft={d.mft} />
       {:else if activeTab === "preview" && d.kind === "fontglyphs"}

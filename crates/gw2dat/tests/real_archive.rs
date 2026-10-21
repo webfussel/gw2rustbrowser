@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use gw2dat::formats::{audio, image, map, model, text};
+use gw2dat::formats::{audio, audio_script, image, map, material, model, shader, text};
 use gw2dat::{Archive, FileType, Index, Kind, ScanProgress};
 
 fn archive() -> Option<Archive> {
@@ -48,6 +48,21 @@ fn decodes_a_sample_of_every_kind() {
                     assert!(model::materials(&data).is_ok(), "materials {id}");
                 }
             }
+            Kind::AudioScript => {
+                audio_script::decode(&data).unwrap_or_else(|e| panic!("audio script {id}: {e}"));
+            }
+            Kind::SoundBankIndex => {
+                // Most indexes only have empty language slots; one lists every bank.
+                audio::decode_bank_index(&data).unwrap_or_else(|e| panic!("bank index {id}: {e}"));
+            }
+            Kind::Material => {
+                let m = material::decode(&data).unwrap_or_else(|e| panic!("material {id}: {e}"));
+                for s in &m.shaders {
+                    let bgfx = shader::bgfx(&s.binary).unwrap_or_else(|e| panic!("shader of {id}: {e}"));
+                    let dxbc = shader::dxbc(bgfx.code).unwrap_or_else(|e| panic!("DXBC of {id}: {e}"));
+                    dxbc.disassemble().expect("program").unwrap_or_else(|e| panic!("disassembly of {id}: {e}"));
+                }
+            }
             Kind::Map => {
                 let m = map::decode(&data).unwrap_or_else(|e| panic!("map {id}: {e}"));
                 if let Some(t) = &m.terrain {
@@ -70,6 +85,9 @@ fn decodes_a_sample_of_every_kind() {
         FileType::ModelAnimation,
         FileType::Strings,
         FileType::MapParam,
+        FileType::Material,
+        FileType::BankIndex,
+        FileType::AudioScript,
     ] {
         assert!(seen.contains_key(&kind), "no {kind:?} found");
     }

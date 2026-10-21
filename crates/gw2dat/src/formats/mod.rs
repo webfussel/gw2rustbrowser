@@ -2,14 +2,17 @@
 
 pub mod animation;
 pub mod audio;
+pub mod audio_script;
 pub mod content;
 pub mod font;
 pub mod granny;
 pub mod image;
 pub mod map;
+pub mod material;
 pub mod model;
 pub mod pf;
 pub mod sequences;
+pub mod shader;
 pub mod skeleton;
 pub mod stars;
 pub mod text;
@@ -53,7 +56,17 @@ pub fn convert(file_type: FileType, data: Vec<u8>) -> Result<Converted> {
             Converted { data: sequences::to_json(&sequences::decode(&data)?).into_bytes(), extension: "json" }
         }
         Kind::StarField => Converted { data: stars::to_csv(&stars::decode(&data)?).into_bytes(), extension: "csv" },
+        Kind::SoundBankIndex => Converted {
+            data: audio::bank_index_to_csv(&audio::decode_bank_index(&data)?).into_bytes(),
+            extension: "csv",
+        },
+        Kind::AudioScript => {
+            Converted { data: audio_script::to_text(&audio_script::decode(&data)?).into_bytes(), extension: "txt" }
+        }
         Kind::Map => Converted { data: map::heightmap_png(&map::decode(&data)?)?, extension: "png" },
+        Kind::Material => {
+            Converted { data: material::to_text(&material::decode(&data)?).into_bytes(), extension: "txt" }
+        }
         Kind::Model => Converted { data: model::to_obj(&model::decode(&data)?, "").into_bytes(), extension: "obj" },
         _ => Converted { data, extension: file_type.extension() },
     };
@@ -95,6 +108,9 @@ pub fn converted_extension(file_type: FileType) -> &'static str {
             Kind::StarField => "csv",
             Kind::Sequences => "json",
             Kind::Map => "png",
+            Kind::AudioScript => "txt",
+            Kind::SoundBankIndex => "csv",
+            Kind::Material => "txt",
             _ => file_type.extension(),
         },
     }

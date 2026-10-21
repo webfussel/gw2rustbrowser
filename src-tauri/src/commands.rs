@@ -334,6 +334,46 @@ pub struct BankEntryDto {
     error: Option<String>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BankIndexLanguageDto {
+    code: usize,
+    name: String,
+    /// Bank file id per bank number, 0 for none.
+    files: Vec<u32>,
+    /// MFT index of each bank file, -1 if it is missing.
+    mfts: Vec<i64>,
+}
+
+/// The languages of a sound bank index that have banks.
+#[tauri::command]
+pub async fn load_bank_index(app: AppHandle, mft: u32) -> CmdResult<Vec<BankIndexLanguageDto>> {
+    blocking(move || {
+        let session = session(&app.state::<AppState>())?;
+        let data = session.read(mft).map_err(err)?;
+        let index = formats::audio::decode_bank_index(&data).map_err(err)?;
+        Ok(index
+            .languages
+            .iter()
+            .enumerate()
+            .filter(|(_, banks)| banks.iter().any(Option::is_some))
+            .map(|(code, banks)| BankIndexLanguageDto {
+                code,
+                name: match formats::text::language_name(code as u8) {
+                    "Unknown" => format!("Language {code}"),
+                    name => name.to_owned(),
+                },
+                files: banks.iter().map(|f| f.unwrap_or(0)).collect(),
+                mfts: banks
+                    .iter()
+                    .map(|f| f.and_then(|id| session.archive.entry_for_id(id)).map_or(-1, i64::from))
+                    .collect(),
+            })
+            .collect())
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn load_bank(app: AppHandle, mft: u32) -> CmdResult<Vec<BankEntryDto>> {
     blocking(move || {

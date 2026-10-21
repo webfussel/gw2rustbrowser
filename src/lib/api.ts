@@ -46,6 +46,8 @@ export type Kind =
   | "image"
   | "sound"
   | "soundbank"
+  | "soundbankindex"
+  | "audioscript"
   | "model"
   | "animation"
   | "strings"
@@ -59,6 +61,7 @@ export type Kind =
   | "sequences"
   | "textpack"
   | "map"
+  | "material"
   | "binary";
 
 export interface FindResult extends FileInfo {
@@ -365,6 +368,158 @@ function parseMap(buffer: ArrayBuffer): MapData {
   };
 }
 
+export interface ScriptFile {
+  id: number;
+  /** MFT index, -1 if the file is not in the archive. */
+  mft: number;
+  kind: string | null;
+}
+
+export interface ScriptSoundFile {
+  file: ScriptFile | null;
+  volume: number;
+  weight: number;
+  condition: string | null;
+  language: string | null;
+}
+
+export interface ScriptSound {
+  name: string;
+  category: string | null;
+  files: ScriptSoundFile[];
+  volume: string;
+  pitch: string;
+  pan: string;
+  fadeIn: number;
+  fadeOut: number;
+  loopCount: number;
+  flags: number;
+  channelMax: number;
+  priority: number;
+  playbackMode: number;
+  positionMode: number;
+  fileIterateMode: number;
+  loopMode: number;
+  dspEffects: number;
+  attenuation: boolean;
+  initialDelay: string | null;
+  repeatCount: string | null;
+  repeatTime: string | null;
+  playLength: string | null;
+  endCue: string | null;
+  offsetBone: string | null;
+  playlist: string | null;
+}
+
+export interface ScriptPlaylist {
+  name: string;
+  category: string | null;
+  primary: string | null;
+  secondary: string | null;
+  files: ScriptSoundFile[];
+  volume: string;
+  fadeIn: number;
+  fadeOut: number;
+  flags: number;
+  fileIterateMode: number;
+  initialSilence: string | null;
+  intervalSilence: string | null;
+}
+
+export interface AudioScriptInfo {
+  version: number;
+  volume: number;
+  fadeIn: number;
+  flags: number;
+  soundPoolCount: number;
+  soundPoolDelay: number;
+  musicCue: string | null;
+  reverbOverride: string | null;
+  snapshot: string | null;
+  sounds: ScriptSound[];
+  triggers: { name: string; markers: { time: number; cue: string | null; end: string | null; kind: number }[] }[];
+  handlers: { name: string; flags: number; size: number; code: string }[];
+  scriptRefs: { name: string; file: ScriptFile | null }[];
+  properties: { name: string; token: string | null; value: number }[];
+  settings: {
+    defaultSnapshot: string | null;
+    distanceScale: number;
+    dopplerScale: number;
+    busses: number;
+    categories: number;
+    materials: number;
+    reverbs: number;
+    snapshots: number;
+    playlists: ScriptPlaylist[];
+    musicExternal: [string, string][];
+    bankIndex: ScriptFile | null;
+    bankScript: ScriptFile | null;
+    musicScript: ScriptFile | null;
+  } | null;
+}
+
+export interface BankIndexLanguage {
+  code: number;
+  name: string;
+  /** Bank file id per bank number, 0 for none. */
+  files: number[];
+  /** MFT index of each bank file, -1 if missing. */
+  mfts: number[];
+}
+
+export interface MaterialEffect {
+  name: string;
+  renderState: string;
+  /** Readable render state parts (blend, depth, culling…). */
+  state: string[];
+  passFlags: number;
+  pixelShader: number;
+  /** [vertex variant, shader index]. */
+  vertexShaders: [number, number][];
+}
+
+export interface MaterialInfo {
+  version: number;
+  settings: {
+    textures: string[];
+    textureCount: number;
+    textureArrayRange: number;
+    sortOrder: number;
+    sortTriangles: number;
+    proceduralAnimation: number;
+    flags: number;
+    debugFlags: number;
+  } | null;
+  techniques: { id: number; passes: MaterialEffect[][] }[];
+  /** Readable sampler state per sampler slot. */
+  samplers: string[];
+  shaders: { stage: string; size: number; profile: string | null; instructions: number; uniforms: number }[];
+}
+
+export interface ShaderSignature {
+  semantic: string;
+  register: number;
+  mask: string;
+  componentType: string;
+  systemValue: number;
+}
+
+export interface MaterialShader {
+  stage: string;
+  bgfxVersion: number;
+  hashIn: number;
+  hashOut: number;
+  uniforms: { name: string; kind: string; count: number; register: number; registerCount: number }[];
+  attributes: string[];
+  constantBufferSize: number;
+  inputs: ShaderSignature[];
+  outputs: ShaderSignature[];
+  profile: string | null;
+  lines: { text: string; depth: number; note: string | null }[];
+  error: string | null;
+  samplers: string[];
+}
+
 export interface PropMesh {
   positions: Float32Array<ArrayBuffer>;
   normals: Float32Array<ArrayBuffer> | null;
@@ -453,6 +608,8 @@ export const api = {
   loadSequences: async (mft: number): Promise<AnimSequence[]> =>
     JSON.parse(new TextDecoder().decode(await invoke<ArrayBuffer>("load_sequences", { mft }))),
   loadStars: (mft: number) => invoke<StarFieldData>("load_stars", { mft }),
+  materialInfo: (mft: number) => invoke<MaterialInfo>("material_info", { mft }),
+  materialShader: (mft: number, index: number) => invoke<MaterialShader>("material_shader", { mft, index }),
   loadMap: async (mft: number) => parseMap(await invoke<ArrayBuffer>("load_map", { mft })),
   loadPropModel: async (fileId: number) => parsePropModel(await invoke<ArrayBuffer>("load_prop_model", { fileId })),
   truetypeInfo: (mft: number) => invoke<TrueTypeInfo>("truetype_info", { mft }),
@@ -473,6 +630,8 @@ export const api = {
   },
   modelMaterials: (mft: number) => invoke<ModelMaterial[]>("model_materials", { mft }),
   loadSound: async (mft: number) => parseSound(await invoke<ArrayBuffer>("load_sound", { mft })),
+  audioScriptInfo: (mft: number) => invoke<AudioScriptInfo>("audio_script_info", { mft }),
+  loadBankIndex: (mft: number) => invoke<BankIndexLanguage[]>("load_bank_index", { mft }),
   loadBank: (mft: number) => invoke<BankEntry[]>("load_bank", { mft }),
   loadBankSound: async (mft: number, index: number) => parseSound(await invoke<ArrayBuffer>("load_bank_sound", { mft, index })),
   loadStrings: (mft: number) => invoke<StringsData>("load_strings", { mft }),

@@ -29,6 +29,8 @@ the window.
 | DDS (DXT, RGB16/24/32, L8, V8U8, R32F), JPEG, PNG, WebP | as above | PNG |
 | Sounds (PF ASND MP3/Ogg, asnd, MP3, Ogg) | Player | MP3/Ogg |
 | Sound banks (ABNK) | List of all entries, play and export individually | one file per playable entry |
+| Sound bank indexes (ABIX) | Which bank file holds each bank number per voice language; pick a bank and play its sounds right there (banks of voice languages that are not installed are marked) | CSV |
+| Audio scripts (AMSP, 21,149 files) | Sound events with their candidate files (playable), volume/pitch ranges, fades, looping and playback settings; trigger keys (cues at animation times), handlers with byte code, script references, properties; the global audio settings script lists all 1,816 music playlists with playable tracks | TXT |
 | Models (MODL, all chunk versions) | 3D view with textures, wireframe, skeleton; **animation playback** (own clips, the skeleton's clips and every animation set made for the skeleton) with timeline and speed | OBJ + MTL + PNG textures |
 | Animation clips (MODL with only an ANIM chunk, 15,218 files) | Name, duration, frames/fps, track groups | raw |
 | Strings (strs) | Table with filter | TSV |
@@ -40,6 +42,7 @@ the window.
 | Star fields (STAR, 2 files) | Sky chart (dome or panorama), stars sized by brightness, colouring by the unknown values, values on hover | CSV |
 | Animation sequences (anic) | Searchable table of 1,853 sequences / 8,858 variants: steps, movement, blend times, timeline with triggers, charge stages | JSON |
 | Maps (mapc, 287 files) | 3D view: terrain heightmap coloured by height and slope, sea level and lakes, props as textured models (loaded within a draw distance around the focus point with markers for the rest, or all at once); click a prop for its model id; size, prop and chunk overview | 16-bit heightmap PNG |
+| Materials (AMAT, 2,854 files) | Texture slots, techniques with their passes and effects (render state decoded: blending, depth, culling), sampler states; per shader: uniforms with registers, input/output signatures, vertex attributes, texture bindings and a shader model 5 disassembly annotated with uniform names | TXT (everything incl. disassembly) |
 | TextPack (txtm manifest, txtV variants, txtv voices) | Every game text by ID and language, full-text search, jump to ID; text variants side by side; voice lines with playback from the sound banks (only playable by default) | raw |
 | Text, everything else | Text or hex view | raw |
 
@@ -108,6 +111,17 @@ file list.
 - Bitmap fonts: all 13 character ranges instead of Basic Latin only; glyph files
   are recognised through the font's references instead of a hard-coded ID list.
 - Sound banks: Ogg entries as well as MP3.
+- Audio scripts: the original listed them only. gw2formats describes chunk
+  version 30; version 33 (all but eight files) adds one dword after
+  `channelMax` in each meta sound. All 133,000 meta sounds decode and all
+  568,603 sound file references resolve.
+- Materials: the original listed them only. The `BGFX` chunk holds
+  [bgfx](https://github.com/bkaradzic/bgfx) shader binaries (GW2's DirectX 11
+  renderer is built on bgfx) wrapping DXBC bytecode; gw2formats only describes
+  chunk version 1 and with a wrong pass layout (effects are stored inline, not as
+  a pointer list). All 2,854 files and their 73,655 distinct shaders decode and
+  disassemble. Names (texture slots, effects) are 5-bit letter tokens like bone
+  names; render and sampler states use bgfx's state bits.
 - Maps: the original's map reader stopped after locating the heightmap. Terrain
   is now assembled from its chunks (32 or 64 tiles per chunk, three overlapping
   samples per edge, rows stored from maximum to minimum y, holes marked with 10000),
@@ -121,7 +135,7 @@ crates/gw2dat/            core library
   src/inflate/            Huffman/LZ decompression (.dat) and texture decompression
   src/filetype.rs         type detection and categories (table-driven)
   src/index.rs            parallel scan, incremental cache
-  src/formats/            pf (PF container), image, audio, model, map, text, font, content
+  src/formats/            pf (PF container), image, audio, audio_script, model, map, material, shader, text, font, content
   examples/               developer tools (see below)
   tests/real_archive.rs   tests against a real Gw2.dat
 src-tauri/                Tauri backend (commands, export)
@@ -150,6 +164,8 @@ GW2_DAT=$PWD/res/Gw2.dat cargo test --release -p gw2dat --test real_archive
 
 ## Known limitations
 
+- The archive only contains the sound banks of the game's voice language; the
+  sound bank index also lists the banks of the other voice languages.
 - Encrypted content (most sound bank entries, some strings) cannot be read.
   The keys come from the game server. This includes the dialogue texts: of
   256,169 voiced texts only one is readable, and 207,236 of 1.2 million English
