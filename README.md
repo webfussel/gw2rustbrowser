@@ -25,10 +25,15 @@ aware of it.
 **If you want to support anything here, support the original projects** —
 star them, contribute to them, credit them. Not this vibe-coded slop. And
 yes, that includes the text you are reading right now: **even this README was
-generated - except for this prologue.**
+generated - except for this prologue which was written by my own hands (and heart).**
 
+Please do not consider opening PRs for this. I will **maybe** continue work on it, but I will decline any PR done.
+My only hope is it can serve as a reference to improve the original tool which, like I already said, **deserve every attention.**
+
+All of it started as an experiment, that evolved out of boredom.
+My goal also was not "Learn Rust" or "Learn Tauri" or anything, because I already know those.
 In the end, I just wanted to provide a fast and stable tool to the community,
-so that maybe more people can do datamining, and it becomes more popular.
+so that maybe more people can do datamining, and it becomes more popular for this game.
 
 # Readme
 Rust port of [Gw2Browser](https://github.com/kytulendu/gw2browser): opens the
