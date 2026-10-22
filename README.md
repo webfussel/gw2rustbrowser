@@ -34,6 +34,14 @@ My goal also was not "Learn Rust" or "Learn Tauri" or anything, because I alread
 In the end, I just wanted to provide a fast and stable tool to the community,
 so that maybe more people can do datamining, and it becomes more popular for this game.
 
+## Screenshots
+
+![Animated model in the 3D viewer with animation playback](readmefiles/screenshot_1.png)
+
+![Star field shown as a sky chart](readmefiles/screenshot_2.png)
+
+![Map in the 3D viewer with terrain, water and props](readmefiles/screenshot_3.png)
+
 # Readme
 Rust port of [Gw2Browser](https://github.com/kytulendu/gw2browser): opens the
 `Gw2.dat` of Guild Wars 2, shows its contents and exports them.
