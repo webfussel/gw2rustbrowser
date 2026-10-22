@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/gw2dat", "src-tauri"]
 
 [workspace.package]
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 

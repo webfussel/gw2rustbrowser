@@ -1205,7 +1205,7 @@ dependencies = [
 
 [[package]]
 name = "gw2browser"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "gw2dat",
  "rayon",
@@ -1218,7 +1218,7 @@ dependencies = [
 
 [[package]]
 name = "gw2dat"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "brotli-decompressor",
  "flate2",
