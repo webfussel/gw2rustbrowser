@@ -20,12 +20,11 @@ for free. This repository only stands on their shoulders.
 And yes: checking out somebody else's carefully built C++ source and going
 "let's rewrite it in Rust" felt incredibly dirty. It is about the most
 stereotypical thing one can do with someone else's project, and I am fully
-aware of it.
+aware of it. And yes, that includes the text you are reading right now: **even this README was
+generated - except for this prologue which was written by my own hands.**
 
 **If you want to support anything here, support the original projects** —
-star them, contribute to them, credit them. Not this vibe-coded slop. And
-yes, that includes the text you are reading right now: **even this README was
-generated - except for this prologue which was written by my own hands (and heart).**
+star them, contribute to them, credit them.
 
 Please do not consider opening PRs for this. I will **maybe** continue work on it, but I will decline any PR done.
 My only hope is it can serve as a reference to improve the original tool which, like I already said, **deserve every attention.**
