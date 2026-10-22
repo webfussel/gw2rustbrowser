@@ -19,7 +19,7 @@ jobs:
     # The oldest supported Ubuntu keeps the glibc requirement of the AppImage low.
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install system dependencies
         run: |
@@ -29,7 +29,7 @@ jobs:
             libxdo-dev libssl-dev patchelf file \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -54,7 +54,7 @@ jobs:
           mkdir out
           mv target/release/bundle/appimage/*.AppImage "out/gw2browser-${GITHUB_REF_NAME}-x86_64.AppImage"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: appimage
           path: out/*
@@ -63,9 +63,9 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -88,7 +88,7 @@ jobs:
           New-Item -ItemType Directory out | Out-Null
           Compress-Archive -Path target/release/gw2browser.exe -DestinationPath "out/gw2browser-$env:GITHUB_REF_NAME-windows-x64.zip"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows
           path: out/*
@@ -99,12 +99,12 @@ jobs:
     needs: [appimage, windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: out
           merge-multiple: true
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: out/*
           generate_release_notes: true
