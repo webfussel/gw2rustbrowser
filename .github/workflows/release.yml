@@ -1,0 +1,110 @@
+# Builds the AppImage and the portable Windows build.
+# Pushing a tag like `v0.1.0` publishes both as a GitHub release; a manual run
+# (Actions tab → Release → Run workflow) only uploads them as workflow artifacts.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  appimage:
+    # The oldest supported Ubuntu keeps the glibc requirement of the AppImage low.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            libxdo-dev libssl-dev patchelf file \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: appimage
+
+      - run: npm ci
+
+      # bundleMediaFramework ships GStreamer inside the AppImage, so MP3/Ogg
+      # playback works without the plugins installed on the user's system.
+      - name: Build AppImage
+        run: >
+          npx tauri build --bundles appimage
+          --config '{"bundle":{"linux":{"appimage":{"bundleMediaFramework":true}}}}'
+
+      - name: Rename AppImage
+        run: |
+          mkdir out
+          mv target/release/bundle/appimage/*.AppImage "out/gw2browser-${GITHUB_REF_NAME}-x86_64.AppImage"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: appimage
+          path: out/*
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows
+
+      - run: npm ci
+
+      # Portable build: the executable contains the frontend, no installer needed.
+      - name: Build executable
+        run: npx tauri build --no-bundle
+
+      - name: Zip executable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory out | Out-Null
+          Compress-Archive -Path target/release/gw2browser.exe -DestinationPath "out/gw2browser-$env:GITHUB_REF_NAME-windows-x64.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: out/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [appimage, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true
