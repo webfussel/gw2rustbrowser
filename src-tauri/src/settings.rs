@@ -7,12 +7,18 @@ use tauri::{AppHandle, Manager};
 
 /// Folder for settings, caches and the web view's data: `data` next to the
 /// executable, so an unpacked copy of the app keeps everything in its own
-/// folder. `None` when that folder cannot be written (e.g. a read-only
-/// install location); the per-user folders are used then.
+/// folder. An AppImage runs from a read-only mount, so there it is `data`
+/// next to the `.AppImage` file (its runtime sets `APPIMAGE` to that path).
+/// `None` when that folder cannot be written (e.g. a read-only install
+/// location); the per-user folders are used then.
 pub fn portable_dir() -> Option<&'static Path> {
     static DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
     DIR.get_or_init(|| {
-        let dir = std::env::current_exe().ok()?.parent()?.join("data");
+        let exe = match std::env::var_os("APPIMAGE") {
+            Some(appimage) => PathBuf::from(appimage),
+            None => std::env::current_exe().ok()?,
+        };
+        let dir = exe.parent()?.join("data");
         std::fs::create_dir_all(&dir).ok()?;
         let probe = dir.join(".write-test");
         std::fs::write(&probe, b"").ok()?;

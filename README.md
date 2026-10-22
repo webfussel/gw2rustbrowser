@@ -86,7 +86,8 @@ npx tauri build --no-bundle --runner cargo-xwin --target x86_64-pc-windows-msvc
 Zip `gw2browser.exe` (from `target/release/` or
 `target/x86_64-pc-windows-msvc/release/`); it runs on Windows 10 and 11, which
 ship the WebView2 runtime. Settings, index caches and the web view's data are
-kept in a `data` folder next to the executable (on every platform), so deleting the unpacked folder
+kept in a `data` folder next to the executable (on every platform; for the
+AppImage next to the `.AppImage` file), so deleting the unpacked folder
 removes everything. Only when that folder cannot be written does the app use
 the per-user folders (`%APPDATA%`/`%LOCALAPPDATA%`, `~/.config`/`~/.cache`).
 
